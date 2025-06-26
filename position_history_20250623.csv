@@ -1,0 +1,2 @@
+id,sync_date,symbol,quantity,cost_price,current_price,market_value,unrealized_pnl,pnl_rate,last_open_time,account_value,settled_funds,created_at
+1,2025-06-23,CL,1.0,87.729,88.67,88.67,0.94,0.0107,06/23/2025 13:50:39 UTC,96.58,7.91,2025-06-23 21:57:44
