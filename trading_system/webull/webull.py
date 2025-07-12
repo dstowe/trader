@@ -56,7 +56,7 @@ class webull :
         #miscellaenous
         self._did = self._get_did()
         self._region_code = region_code or 6
-        self.zone_var = 'dc_core_r001'
+        self.zone_var = 'dc_core1'
         self.timeout = 15
 
     def _get_did(self, path=''):

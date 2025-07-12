@@ -6,7 +6,7 @@ from typing import Tuple, Dict
 from .credentials import CredentialManager
 
 class LoginManager:
-    """Handles login operations with retry logic and error handling"""
+    """Handles login operations with retry logic, error handling, and enhanced session management"""
     
     def __init__(self, wb, credential_manager: CredentialManager = None, logger=None):
         self.wb = wb
@@ -21,7 +21,7 @@ class LoginManager:
         self.base_trade_token_delay = 10  # seconds
     
     def login_automatically(self) -> bool:
-        """Automated login using stored credentials with retry logic"""
+        """Automated login using stored credentials with retry logic and enhanced session management"""
         for attempt in range(1, self.max_login_attempts + 1):
             try:
                 self.logger.info(f"Starting automated login attempt {attempt}/{self.max_login_attempts}...")
@@ -91,6 +91,83 @@ class LoginManager:
                 self.logger.error(f"❌ All {self.max_login_attempts} login attempts failed")
         
         return False
+    
+    def login_with_session_management(self, session_manager) -> bool:
+        """
+        Enhanced login with automatic session management and detailed diagnostics
+        
+        Args:
+            session_manager: SessionManager instance
+            
+        Returns:
+            bool: True if successfully logged in, False otherwise
+        """
+        try:
+            self.logger.info("🔐 Starting enhanced authentication with session management")
+            
+            # Step 1: Diagnose any existing session issues
+            self.logger.info("🔍 Diagnosing session health...")
+            diagnosis = session_manager.diagnose_session_issues(self.wb)
+            
+            if diagnosis['issues']:
+                self.logger.info("⚠️  Session issues detected:")
+                for issue in diagnosis['issues']:
+                    self.logger.info(f"   • {issue}")
+            
+            # Step 2: Try to use existing session with automatic cleanup
+            self.logger.info("🔍 Attempting to use existing session...")
+            if session_manager.auto_manage_session(self.wb):
+                self.logger.info("✅ Using existing/refreshed session")
+                
+                # Verify login status with a simple test
+                if self.check_login_status():
+                    self.is_logged_in = True
+                    
+                    # Get session info for logging
+                    session_info = session_manager.get_session_info()
+                    if session_info.get('expires_in_minutes'):
+                        self.logger.info(f"📅 Session expires in {session_info['expires_in_minutes']} minutes")
+                    
+                    return True
+                else:
+                    self.logger.warning("⚠️  Session loaded but login verification failed")
+                    # Clear potentially bad session and try fresh login
+                    session_manager.clear_session()
+            else:
+                self.logger.info("🔄 Session management determined fresh login is needed")
+            
+            # Step 3: If no valid session, perform fresh login
+            self.logger.info("🔄 Performing fresh login...")
+            if self.login_automatically():
+                self.logger.info("✅ Fresh login successful")
+                self.is_logged_in = True
+                
+                # Save the new session
+                if session_manager.save_session(self.wb):
+                    self.logger.info("💾 New session saved successfully")
+                else:
+                    self.logger.warning("⚠️  Could not save new session")
+                
+                # Clean up old backups
+                cleaned = session_manager.cleanup_old_backups()
+                if cleaned > 0:
+                    self.logger.info(f"🧹 Cleaned up {cleaned} old session backups")
+                
+                return True
+            else:
+                self.logger.error("❌ CRITICAL: Fresh login failed after all retries")
+                
+                # Final diagnosis for troubleshooting
+                self.logger.error("🔍 Final session diagnosis:")
+                final_diagnosis = session_manager.diagnose_session_issues(self.wb)
+                for recommendation in final_diagnosis['recommendations']:
+                    self.logger.error(f"   📋 {recommendation}")
+                
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error during enhanced authentication: {e}")
+            return False
     
     def _get_trade_token_with_retry(self, trading_pin: str) -> bool:
         """Get trade token with retry logic"""
@@ -225,18 +302,63 @@ class LoginManager:
             return False
     
     def check_login_status(self) -> bool:
-        """Check if currently logged in and properly initialize account context"""
+        """Check if currently logged in with robust error handling for API changes"""
         try:
             # Try to make a simple API call to check login status
-            # This also initializes the account context properly
-            account_id = self.wb.get_account_id()
-            if account_id:
-                self.is_logged_in = True
-                self.logger.info(f"Login status verified, account context initialized: {account_id}")
-                return True
-            else:
+            # Use a more basic API call that's less likely to fail
+            self.logger.debug("Checking login status with API call...")
+            
+            # Try getting account details first - this is often more reliable
+            try:
+                account_data = self.wb.get_account()
+                if account_data and isinstance(account_data, dict):
+                    self.is_logged_in = True
+                    self.logger.debug("Login verified via get_account() call")
+                    return True
+            except Exception as e:
+                self.logger.debug(f"get_account() failed: {e}")
+            
+            # Fallback: try direct API call to avoid get_account_id's parsing issues
+            try:
+                headers = self.wb.build_req_headers()
+                response = self.wb._session.get(self.wb._urls.account_id(), headers=headers, timeout=self.wb.timeout)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get('success') and result.get('data'):
+                        self.is_logged_in = True
+                        self.logger.debug("Login verified via direct account_id API call")
+                        
+                        # Try to extract and set account details if possible
+                        try:
+                            account_data = result['data'][0] if result['data'] else {}
+                            if 'secAccountId' in account_data:
+                                self.wb._account_id = str(account_data['secAccountId'])
+                                # Handle zone variable with fallback
+                                self.wb.zone_var = str(account_data.get('rzone', account_data.get('zone', 'dc_core_r001')))
+                                self.logger.debug(f"Account context set: {self.wb._account_id}")
+                        except Exception as e:
+                            self.logger.debug(f"Could not extract account details: {e}")
+                        
+                        return True
+                    else:
+                        self.logger.debug(f"API returned unsuccessful response: {result}")
+                        self.is_logged_in = False
+                        return False
+                elif response.status_code == 401:
+                    self.logger.debug("API returned 401 - session invalid")
+                    self.is_logged_in = False
+                    return False
+                else:
+                    self.logger.debug(f"API returned status {response.status_code}")
+                    self.is_logged_in = False
+                    return False
+                    
+            except Exception as e:
+                self.logger.debug(f"Direct API call failed: {e}")
                 self.is_logged_in = False
                 return False
+                
         except Exception as e:
             self.logger.debug(f"Login status check failed: {e}")
             self.is_logged_in = False
@@ -271,3 +393,54 @@ class LoginManager:
             'account_id': getattr(self.wb, '_account_id', None),
             'uuid': getattr(self.wb, '_uuid', None)
         }
+    
+    def validate_session_health(self, session_manager) -> Dict:
+        """
+        Validate the health of the current session
+        
+        Args:
+            session_manager: SessionManager instance
+            
+        Returns:
+            Dict with session health information
+        """
+        try:
+            health_info = {
+                'session_valid': False,
+                'login_verified': False,
+                'account_accessible': False,
+                'expires_soon': False,
+                'needs_refresh': False,
+                'session_info': {}
+            }
+            
+            # Check session file and data
+            session_info = session_manager.get_session_info()
+            health_info['session_info'] = session_info
+            
+            if session_info.get('exists', False):
+                health_info['session_valid'] = True
+                health_info['expires_soon'] = session_info.get('expires_soon', False)
+                
+                # Check if login is verified
+                if self.check_login_status():
+                    health_info['login_verified'] = True
+                    health_info['account_accessible'] = True
+                
+                # Determine if refresh is needed
+                expires_in = session_info.get('expires_in_minutes', 0)
+                if expires_in and expires_in < 30:  # Less than 30 minutes
+                    health_info['needs_refresh'] = True
+            
+            return health_info
+            
+        except Exception as e:
+            self.logger.error(f"Error validating session health: {e}")
+            return {
+                'session_valid': False,
+                'login_verified': False,
+                'account_accessible': False,
+                'expires_soon': True,
+                'needs_refresh': True,
+                'error': str(e)
+            }

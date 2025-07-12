@@ -1,17 +1,18 @@
-# automated_system.py (Refactored)
+# automated_system.py (Enhanced with Session Management)
 """
 Enhanced Automated Multi-Account Personal Trading System
 Fully integrated with PersonalTradingConfig for consistent rule enforcement
 Runs daily at configured trading hours via Windows Task Scheduler
 No user interaction required - respects all personal trading preferences
 
-Refactored version with modular authentication and account management
+Enhanced version with modular authentication, session management, and API compatibility patches
 """
 
 import sys
 import os
 import json
 import logging
+import glob
 from datetime import datetime, timedelta
 from pathlib import Path
 import traceback
@@ -31,20 +32,24 @@ class EnhancedAutomatedTradingSystem:
     """
     Enhanced Automated Multi-Account Trading System
     Fully integrated with PersonalTradingConfig for complete consistency
-    Now with modular authentication and account management
+    Enhanced with session management and API compatibility patches
     """
     
     def __init__(self):
         # Use PersonalTradingConfig as the single source of truth
         self.config = PersonalTradingConfig()
+        
+        # Initialize webull with compatibility patches
         self.wb = webull()
+        self.wb = self._apply_webull_patches(self.wb)
+        
         self.trading_system = TradingSystem()
         self.db = DatabaseManager(self.config.DATABASE_PATH)
         
         # Setup logging
         self.setup_logging()
         
-        # Initialize auth components
+        # Initialize enhanced auth components
         self.credential_manager = CredentialManager(logger=self.logger)
         self.login_manager = LoginManager(self.wb, self.credential_manager, self.logger)
         self.session_manager = SessionManager(logger=self.logger)
@@ -67,6 +72,94 @@ class EnhancedAutomatedTradingSystem:
         # Load rule enforcement summary
         self.rule_summary = self.config.get_rule_enforcement_summary()
         self.logger.info(f"🛡️ Rule Enforcement Active: {self.rule_summary}")
+    
+    def _apply_webull_patches(self, wb):
+        """Apply compatibility patches for API changes"""
+        try:
+            self.logger = logging.getLogger(__name__)  # Temporary logger for init
+            
+            # Patch get_account_id to handle missing 'rzone' field
+            original_get_account_id = wb.get_account_id
+            
+            def patched_get_account_id(id=0):
+                try:
+                    headers = wb.build_req_headers()
+                    response = wb._session.get(wb._urls.account_id(), headers=headers, timeout=wb.timeout)
+                    result = response.json()
+                    
+                    if result.get('success') and len(result.get('data', [])) > 0:
+                        account_data = result['data'][int(id)]
+                        
+                        # Handle zone variable with multiple fallbacks
+                        zone_value = 'dc_core_r001'  # Safe default
+                        for zone_field in ['rzone', 'zone', 'zoneVar', 'zone_var']:
+                            if zone_field in account_data:
+                                zone_value = str(account_data[zone_field])
+                                break
+                        
+                        wb.zone_var = zone_value
+                        wb._account_id = str(account_data['secAccountId'])
+                        if hasattr(self, 'logger'):
+                            self.logger.debug(f"Account ID: {wb._account_id}, Zone: {wb.zone_var}")
+                        return wb._account_id
+                    else:
+                        if hasattr(self, 'logger'):
+                            self.logger.warning(f"get_account_id failed: {result}")
+                        return None
+                        
+                except KeyError as e:
+                    if hasattr(self, 'logger'):
+                        self.logger.debug(f"KeyError in get_account_id - using fallback: {e}")
+                    # Try to extract what we can
+                    try:
+                        if result.get('success') and len(result.get('data', [])) > 0:
+                            account_data = result['data'][int(id)]
+                            if 'secAccountId' in account_data:
+                                wb._account_id = str(account_data['secAccountId'])
+                                wb.zone_var = 'dc_core_r001'  # Safe default
+                                if hasattr(self, 'logger'):
+                                    self.logger.info(f"Partial success - Account ID: {wb._account_id}")
+                                return wb._account_id
+                    except:
+                        pass
+                    return None
+                except Exception as e:
+                    if hasattr(self, 'logger'):
+                        self.logger.warning(f"Error in patched get_account_id: {e}")
+                    return None
+            
+            # Apply the patch
+            wb.get_account_id = patched_get_account_id
+            
+            return wb
+            
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.warning(f"⚠️  Could not apply webull patches: {e}")
+            return wb
+    
+    def clear_corrupted_session(self):
+        """Clear corrupted session files"""
+        try:
+            session_files = ['webull_session.json'] + glob.glob('webull_session.json.backup_*')
+            
+            cleared = 0
+            for session_file in session_files:
+                if os.path.exists(session_file):
+                    os.remove(session_file)
+                    cleared += 1
+                    self.logger.info(f"🗑️  Removed corrupted session: {session_file}")
+            
+            if cleared > 0:
+                self.logger.info(f"Cleared {cleared} corrupted session files")
+                return True
+            else:
+                self.logger.info("No session files to clear")
+                return False
+                
+        except Exception as e:
+            self.logger.warning(f"Error clearing session files: {e}")
+            return False
         
     def load_todays_trades(self):
         """Load today's trades for day trading detection across all accounts"""
@@ -122,37 +215,90 @@ class EnhancedAutomatedTradingSystem:
             self.logger.warning(f"Could not clean up old logs: {e}")
     
     def authenticate(self) -> bool:
-        """Handle authentication using the new modular system"""
+        """Handle authentication using the enhanced modular system with automatic session cleanup"""
         try:
-            self.logger.info("🔐 Step: Authentication")
+            self.logger.info("🔐 Step: Enhanced Authentication with Session Management")
             
-            # Try to load existing session first
-            if self.session_manager.auto_manage_session(self.wb):
-                self.logger.info("✅ Using existing session")
-                # Verify login status and ensure account context is properly initialized
-                if self.login_manager.check_login_status():
-                    self.is_logged_in = True
-                    return True
-                else:
-                    self.logger.warning("Session loaded but login verification failed")
-                    # Clear potentially bad session and try fresh login
-                    self.session_manager.clear_session()
-            
-            # If no valid session or verification failed, perform fresh login
-            self.logger.info("Attempting fresh login...")
-            if self.login_manager.login_automatically():
-                self.logger.info("✅ Fresh login successful")
+            # Use the enhanced login method with session management
+            if self.login_manager.login_with_session_management(self.session_manager):
+                self.logger.info("✅ Authentication successful")
                 self.is_logged_in = True
                 
-                # Save the new session
-                self.session_manager.save_session(self.wb)
+                # Validate session health after login
+                health_info = self.login_manager.validate_session_health(self.session_manager)
+                
+                if health_info.get('expires_soon', False):
+                    expires_in = health_info.get('session_info', {}).get('expires_in_minutes', 'unknown')
+                    self.logger.warning(f"⚠️  Session expires soon ({expires_in} minutes)")
+                
+                if health_info.get('needs_refresh', False):
+                    self.logger.info("🔄 Session needs refresh - will be handled automatically on next run")
+                
                 return True
             else:
-                self.logger.error("❌ CRITICAL: Authentication failed after all retries")
+                self.logger.error("❌ CRITICAL: Enhanced authentication failed")
                 return False
                 
         except Exception as e:
             self.logger.error(f"❌ Authentication error: {e}")
+            return False
+    
+    def check_session_health(self) -> bool:
+        """Check and report on session health"""
+        try:
+            self.logger.info("🏥 Checking session health...")
+            
+            health_info = self.login_manager.validate_session_health(self.session_manager)
+            
+            if health_info.get('session_valid', False):
+                session_info = health_info.get('session_info', {})
+                expires_in = session_info.get('expires_in_minutes', 'unknown')
+                
+                if health_info.get('account_accessible', False):
+                    self.logger.info(f"✅ Session healthy - expires in {expires_in} minutes")
+                    
+                    if health_info.get('expires_soon', False):
+                        self.logger.warning(f"⚠️  Session expires soon - consider refresh")
+                    
+                    return True
+                else:
+                    self.logger.warning("⚠️  Session exists but account not accessible")
+                    return False
+            else:
+                self.logger.warning("⚠️  No valid session found")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error checking session health: {e}")
+            return False
+    
+    def proactive_session_maintenance(self) -> bool:
+        """Perform proactive session maintenance"""
+        try:
+            self.logger.info("🔧 Performing proactive session maintenance...")
+            
+            # Check if session cleanup is needed
+            session_removed = self.session_manager.remove_expiring_session()
+            if session_removed:
+                self.logger.info("🧹 Removed expiring session during maintenance")
+            
+            # Clean up old backups
+            cleaned = self.session_manager.cleanup_old_backups(max_age_days=7)
+            if cleaned > 0:
+                self.logger.info(f"🗑️  Cleaned up {cleaned} old session backups")
+            
+            # Validate current session health
+            health_status = self.check_session_health()
+            
+            if health_status:
+                self.logger.info("✅ Session maintenance completed - session healthy")
+            else:
+                self.logger.warning("⚠️  Session maintenance completed - session needs attention")
+            
+            return health_status
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error during session maintenance: {e}")
             return False
     
     def discover_and_setup_accounts(self) -> bool:
@@ -206,7 +352,7 @@ class EnhancedAutomatedTradingSystem:
         
         # Check if it's a weekday (Monday = 0, Sunday = 6)
         weekday = datetime.now().weekday()
-        is_weekday = weekday < 57  # Monday-Friday < 5
+        is_weekday = weekday < 5  # Monday-Friday < 5
         
         if not is_weekday:
             self.logger.info("Not running - market closed (weekend)")
@@ -626,12 +772,15 @@ class EnhancedAutomatedTradingSystem:
             self.logger.info(f"💰 Min Position: ${self.config.MIN_POSITION_VALUE}")
             self.logger.info(f"📊 Max Positions: {self.config.MAX_POSITIONS_TOTAL}")
             
+            # Proactive session maintenance
+            self.proactive_session_maintenance()
+            
             # Pre-flight safety checks using PersonalTradingConfig
             if not self.check_market_hours():
                 self.logger.info("✅ Enhanced system ran successfully - market not open")
                 return True  # Not an error condition
             
-            # Step 1: Authenticate with new modular system
+            # Step 1: Authenticate with enhanced session management
             if not self.authenticate():
                 return False
             
