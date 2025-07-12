@@ -59,7 +59,7 @@ class PersonalTradingConfig(TradingConfig):
     
     # Time Preferences
     TRADING_START_TIME = "00:45"  # Wait 15 min after market open
-    TRADING_END_TIME = "15:30"    # Stop 30 min before close
+    TRADING_END_TIME = "23:30"    # Stop 30 min before close
     
     # Notification Preferences
     REQUIRE_CONFIRMATION = True       # Always ask before trading

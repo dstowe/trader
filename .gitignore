@@ -1,5 +1,6 @@
 /logs
 /___pycache__
+*/___pycache__
 *.bin
 *.enc
 *.db
