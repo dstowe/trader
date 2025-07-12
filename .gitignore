@@ -1,5 +1,8 @@
 /logs
-/___pycache__
+__pycache__
+/__pycache__
+/*/__pycache__
+*.pyc
 *.bin
 *.enc
 *.db
