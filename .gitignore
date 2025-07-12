@@ -1,0 +1,7 @@
+/logs
+/___pycache__
+*.bin
+*.enc
+*.db
+*.key
+*.json
