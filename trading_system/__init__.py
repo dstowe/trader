@@ -6,7 +6,7 @@ A modular trading system with authentication, account management, and trading st
 __version__ = "2.0.0"
 
 from .main import TradingSystem
-from .config.settings import TradingConfig
+# UPDATED: Remove TradingConfig import since we're using PersonalTradingConfig as single source of truth
 from .config.stock_lists import StockLists
 from .webull.webull import webull
 
@@ -16,7 +16,6 @@ from .accounts import AccountManager, AccountInfo
 
 __all__ = [
     'TradingSystem', 
-    'TradingConfig', 
     'StockLists', 
     'webull',
     'CredentialManager',

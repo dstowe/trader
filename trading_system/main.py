@@ -1,4 +1,4 @@
-# trading_system/main.py - FIXED to accept config parameter
+# trading_system/main.py - UPDATED to use PersonalTradingConfig as single source of truth
 import sys
 import os
 from datetime import datetime, timedelta
@@ -8,7 +8,8 @@ import time
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config.settings import TradingConfig  # Keep for backward compatibility
+# UPDATED: Import PersonalTradingConfig instead of TradingConfig
+from personal_config import PersonalTradingConfig
 from config.stock_lists import StockLists
 from database.models import DatabaseManager
 from data.webull_client import DataFetcher
@@ -27,13 +28,12 @@ from strategies.value_rate_strategy import ValueRateStrategy
 from ai.market_analyzer import MarketConditionAnalyzer
 
 class TradingSystem:
-    """Main trading system orchestrator - FIXED to use injected config"""
+    """Main trading system orchestrator - UPDATED to use PersonalTradingConfig as single source of truth"""
     
     def __init__(self, config=None):
-        # FIXED: Accept config parameter or use default
-        # This allows automated_system.py to inject PersonalTradingConfig
-        # while maintaining backward compatibility
-        self.config = config if config is not None else TradingConfig()
+        # UPDATED: Use PersonalTradingConfig as default instead of TradingConfig
+        # This ensures PersonalTradingConfig is the single source of truth
+        self.config = config if config is not None else PersonalTradingConfig()
         
         self.db = DatabaseManager(self.config.DATABASE_PATH)
         self.data_fetcher = DataFetcher()
@@ -360,7 +360,7 @@ def main():
     """Main entry point"""
     print("Initializing Trading System...")
     
-    # Create trading system with default config (backward compatibility)
+    # Create trading system with PersonalTradingConfig as default
     trading_system = TradingSystem()
     
     # Run analysis
