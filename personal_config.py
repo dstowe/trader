@@ -33,7 +33,7 @@ class PersonalTradingConfig(TradingConfig):
     MAX_STRATEGY_ATTEMPTS = 2           # How many strategies to try before giving up
     
     # Market Condition Override
-    IGNORE_MARKET_CONDITIONS = True    # If True, always use FORCED_STRATEGY regardless of market
+    IGNORE_MARKET_CONDITIONS = False    # If True, always use FORCED_STRATEGY regardless of market
     
     # =================================================================
     # PERSONAL TRADING RULES (CRITICAL - NEVER OVERRIDE) - CLASS LEVEL
