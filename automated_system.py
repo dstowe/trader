@@ -32,9 +32,9 @@ except ImportError as e:
     
     # Create minimal fallback
     class TradingSystem:
-        def __init__(self, config=None): 
+        def __init__(self, config=None):
             self.config = config
-        def run_daily_analysis(self, **kwargs): 
+        def run_daily_analysis(self, **kwargs):
             return {'error': 'TradingSystem not available'}
 
 # Import PersonalTradingConfig
@@ -99,7 +99,7 @@ class EnhancedAutomatedTradingSystem:
                 
                 today = datetime.now().date().isoformat()
                 self.todays_trades = [
-                    trade for trade in all_trades 
+                    trade for trade in all_trades
                     if trade.get('date', '').startswith(today)
                 ]
             else:
@@ -319,12 +319,13 @@ class EnhancedAutomatedTradingSystem:
             return []
         
         for signal in signals:
-            symbol = signal['symbol']
-            signal_type = signal['signal_type']
+            # Assuming signal is a TradingSignal object, not a dict
+            symbol = signal.symbol
+            signal_type = signal.signal_type
             
             # Use PersonalTradingConfig comprehensive signal validation (AUTHORITATIVE)
             should_execute, reason = self.config.should_execute_signal(
-                signal, 
+                signal,
                 current_positions=position_symbols,
                 account_value=account.net_liquidation,
                 recent_trades=account_trades
@@ -342,21 +343,13 @@ class EnhancedAutomatedTradingSystem:
             # Position sizing for BUY signals using CENTRALIZED method (UPDATED)
             if signal_type == 'BUY':
                 # Extract strategy name and metadata for position adjustments
-                strategy_name = signal.get('strategy', 'Unknown')
-                signal_metadata = {}
-                
-                # Parse metadata if it exists
-                if 'metadata' in signal:
-                    try:
-                        import json
-                        signal_metadata = json.loads(signal['metadata']) if isinstance(signal['metadata'], str) else signal['metadata']
-                    except:
-                        signal_metadata = {}
+                strategy_name = signal.strategy
+                signal_metadata = signal.metadata # Assuming metadata is directly accessible
                 
                 # Use centralized position sizing with strategy adjustments
                 position_info = self.config.get_position_size_with_strategy_adjustments(
-                    signal['price'], 
-                    account.net_liquidation, 
+                    signal.price,
+                    account.net_liquidation,
                     account.settled_funds,
                     strategy_name=strategy_name,
                     signal_metadata=signal_metadata
@@ -366,21 +359,24 @@ class EnhancedAutomatedTradingSystem:
                     self.logger.debug(f"⚠️ {account.account_type}: Insufficient funds for {symbol} - {position_info.get('reason', 'Unknown')}")
                     continue
                 
-                signal['calculated_position_info'] = position_info
-                signal['target_account'] = account.account_id
+                # Convert signal to a dictionary for easier modification if necessary, or add attribute
+                # If TradingSignal is mutable, you could directly add:
+                signal.calculated_position_info = position_info
+                signal.target_account = account.account_id
             
-            filtered_signals.append(signal)
+            filtered_signals.append(signal) # Append the modified TradingSignal object
         
         return filtered_signals
     
-    def execute_trade_automatically_on_account(self, account: AccountInfo, signal: Dict) -> bool:
+    def execute_trade_automatically_on_account(self, account: AccountInfo, signal) -> bool: # Changed signal type hint to reflect object
         """Execute trade automatically on specific account with enhanced retry logic"""
         max_attempts = 3
         base_delay = 10
         
-        symbol = signal['symbol']
-        signal_type = signal['signal_type']
-        price = signal['price']
+        # Access attributes using dot notation
+        symbol = signal.symbol
+        signal_type = signal.signal_type
+        price = signal.price
         
         self.logger.info(f"💰 EXECUTING: {signal_type} {symbol} @ ${price:.2f} on {account.account_type}")
         
@@ -393,20 +389,13 @@ class EnhancedAutomatedTradingSystem:
                 
                 # Calculate position sizing using CENTRALIZED method (UPDATED)
                 if signal_type == 'BUY':
-                    if 'calculated_position_info' in signal:
-                        # Use pre-calculated position info from filtering stage
-                        position_info = signal['calculated_position_info']
+                    # Use pre-calculated position info from filtering stage
+                    if hasattr(signal, 'calculated_position_info'):
+                        position_info = signal.calculated_position_info
                     else:
                         # Fallback: calculate on-demand using centralized method
-                        strategy_name = signal.get('strategy', 'Unknown')
-                        signal_metadata = {}
-                        
-                        if 'metadata' in signal:
-                            try:
-                                import json
-                                signal_metadata = json.loads(signal['metadata']) if isinstance(signal['metadata'], str) else signal['metadata']
-                            except:
-                                signal_metadata = {}
+                        strategy_name = signal.strategy
+                        signal_metadata = signal.metadata # Assuming metadata is directly accessible
                         
                         position_info = self.config.get_position_size_with_strategy_adjustments(
                             price, account.net_liquidation, account.settled_funds,
@@ -570,7 +559,7 @@ class EnhancedAutomatedTradingSystem:
         # Default to retryable for unknown exceptions
         return True
     
-    def log_trade_execution(self, signal: Dict, quantity: float, order_result: Dict, account: AccountInfo):
+    def log_trade_execution(self, signal, quantity: float, order_result: Dict, account: AccountInfo): # Changed signal type hint to reflect object
         """Log automated trade execution for enhanced multi-account system"""
         try:
             trade_record = {
@@ -578,14 +567,14 @@ class EnhancedAutomatedTradingSystem:
                 'date': datetime.now().date().isoformat(),
                 'account_id': account.account_id,
                 'account_type': account.account_type,
-                'symbol': signal['symbol'],
-                'action': signal['signal_type'],
+                'symbol': signal.symbol, # Access using dot notation
+                'action': signal.signal_type, # Access using dot notation
                 'quantity': quantity,
-                'price': signal['price'],
+                'price': signal.price, # Access using dot notation
                 'automated': True,
                 'enhanced_system': True,
                 'order_id': order_result.get('orderId', 'N/A'),
-                'strategy': signal.get('strategy', 'Unknown'),
+                'strategy': signal.strategy, # Access using dot notation
                 'rule_enforcement': True,
                 'fractional_enabled': True
             }
@@ -607,7 +596,7 @@ class EnhancedAutomatedTradingSystem:
             with open(self.trade_log_file, 'w') as f:
                 json.dump(all_trades, f, indent=2)
                 
-            self.logger.info(f"📝 Enhanced trade logged: {signal['signal_type']} {signal['symbol']} on {account.account_type}")
+            self.logger.info(f"📝 Enhanced trade logged: {signal.signal_type} {signal.symbol} on {account.account_type}") # Access using dot notation
             
         except Exception as e:
             self.logger.warning(f"⚠️ Error logging enhanced trade: {e}")
@@ -628,13 +617,13 @@ class EnhancedAutomatedTradingSystem:
                         is_buy_and_hold = pos['symbol'] in self.config.BUY_AND_HOLD_POSITIONS
                         
                         conn.execute('''
-                            INSERT OR REPLACE INTO enhanced_position_history 
-                            (sync_date, account_id, account_type, symbol, quantity, cost_price, current_price, 
+                            INSERT OR REPLACE INTO enhanced_position_history
+                            (sync_date, account_id, account_type, symbol, quantity, cost_price, current_price,
                             market_value, unrealized_pnl, pnl_rate, last_open_time,
                             account_value, settled_funds, is_fractional, is_buy_and_hold, enhanced_system)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
-                            sync_date, account.account_id, account.account_type, pos['symbol'], pos['quantity'], 
+                            sync_date, account.account_id, account.account_type, pos['symbol'], pos['quantity'],
                             pos['cost_price'], pos['current_price'], pos['market_value'], pos['unrealized_pnl'],
                             pos['pnl_rate'], pos['last_open_time'], account.net_liquidation,
                             account.settled_funds, 1 if is_fractional else 0, 1 if is_buy_and_hold else 0, 1
@@ -778,6 +767,7 @@ class EnhancedAutomatedTradingSystem:
             
             # Step 6: Process and distribute signals with PersonalTradingConfig rule enforcement (SINGLE SOURCE OF TRUTH)
             self.logger.info("📋 Step 6: Processing signals with enhanced rule enforcement...")
+            # Assuming results['buy_signals'] and results['sell_signals'] contain TradingSignal objects
             all_signals = results['buy_signals'] + results['sell_signals']
             
             self.logger.info(f"   📊 Strategy Used: {results['strategy_used']}")
@@ -797,19 +787,20 @@ class EnhancedAutomatedTradingSystem:
             buy_and_hold_protected = 0
             
             for i, signal in enumerate(all_signals, 1):
-                self.logger.debug(f"\n📊 Signal {i}/{len(all_signals)}: {signal['signal_type']} {signal['symbol']} @ ${signal['price']:.2f}")
-                self.logger.debug(f"   Confidence: {signal.get('confidence', 0):.1%}")
+                # Access attributes using dot notation
+                self.logger.debug(f"\n📊 Signal {i}/{len(all_signals)}: {signal.signal_type} {signal.symbol} @ ${signal.price:.2f}")
+                self.logger.debug(f"   Confidence: {signal.confidence:.1%}")
                 
                 # Check minimum confidence using PersonalTradingConfig (AUTHORITATIVE)
-                if signal.get('confidence', 0) < self.config.MIN_SIGNAL_CONFIDENCE:
+                if signal.confidence < self.config.MIN_SIGNAL_CONFIDENCE:
                     self.logger.debug(f"   ❌ Below minimum confidence threshold ({self.config.MIN_SIGNAL_CONFIDENCE:.1%})")
                     confidence_filtered += 1
                     continue
                 
                 # Check buy-and-hold protection using PersonalTradingConfig (AUTHORITATIVE)
-                if (signal['symbol'] in self.config.BUY_AND_HOLD_POSITIONS and 
-                    signal['signal_type'] == 'SELL'):
-                    self.logger.debug(f"   🛡️ BUY-AND-HOLD PROTECTION: {signal['symbol']}")
+                if (signal.symbol in self.config.BUY_AND_HOLD_POSITIONS and
+                    signal.signal_type == 'SELL'):
+                    self.logger.debug(f"   🛡️ BUY-AND-HOLD PROTECTION: {signal.symbol}")
                     buy_and_hold_protected += 1
                     continue
                 
@@ -818,7 +809,10 @@ class EnhancedAutomatedTradingSystem:
                 for account in self.trading_accounts:
                     filtered_signals = self.filter_signals_for_account([signal], account)
                     if filtered_signals:
-                        suitable_accounts.append(account)
+                        # If filter_signals_for_account returns a non-empty list, it means the signal
+                        # was suitable for this account and potentially modified (e.g., added calculated_position_info)
+                        # We should use the modified signal from filtered_signals for execution
+                        suitable_accounts.append((account, filtered_signals[0])) # Store account and modified signal
                     else:
                         total_rule_violations += 1
                 
@@ -828,14 +822,18 @@ class EnhancedAutomatedTradingSystem:
                 
                 # Automatically select best account using enhanced logic
                 if len(suitable_accounts) > 1:
-                    best_account = max(suitable_accounts, key=lambda a: a.settled_funds)
+                    # Select based on settled funds, using the (account, signal) tuple
+                    best_account_tuple = max(suitable_accounts, key=lambda x: x[0].settled_funds)
+                    best_account = best_account_tuple[0]
+                    signal_to_execute = best_account_tuple[1]
                     self.logger.info(f"   🎯 Auto-selected: {best_account.account_type} (${best_account.settled_funds:.2f} available)")
                 else:
-                    best_account = suitable_accounts[0]
+                    best_account = suitable_accounts[0][0]
+                    signal_to_execute = suitable_accounts[0][1]
                     self.logger.info(f"   🎯 Using: {best_account.account_type}")
                 
                 # Execute trade on selected account with enhanced logging
-                if self.execute_trade_automatically_on_account(best_account, signal):
+                if self.execute_trade_automatically_on_account(best_account, signal_to_execute): # Pass the modified signal
                     executed_trades += 1
                     self.logger.info(f"   ✅ Enhanced trade {executed_trades} executed successfully on {best_account.account_type}")
                     
@@ -848,7 +846,7 @@ class EnhancedAutomatedTradingSystem:
                         import time
                         time.sleep(5)
                 else:
-                    self.logger.warning(f"   ❌ Enhanced trade failed for {signal['symbol']}")
+                    self.logger.warning(f"   ❌ Enhanced trade failed for {signal.symbol}") # Access using dot notation
             
             # Step 7: Final summary and cleanup
             end_time = datetime.now()
