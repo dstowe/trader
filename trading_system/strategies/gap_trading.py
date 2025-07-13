@@ -1,13 +1,16 @@
-# strategies/gap_trading.py
+# trading_system/strategies/gap_trading.py - FIXED VERSION
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional
 from datetime import datetime, time
 import json
 
-class GapTradingStrategy:
+# CRITICAL: Import the base classes to fix Pylance errors
+from .base_strategy import TradingStrategy, TradingSignal
+
+class GapTradingStrategy(TradingStrategy):
     """
-    Gap Trading Strategy for volatile morning moves
+    Gap Trading Strategy for volatile morning moves - Refactored
     
     Strategy Types:
     1. Gap Fade: Trade against the gap (mean reversion)
@@ -26,10 +29,16 @@ class GapTradingStrategy:
     """
     
     def __init__(self, config):
-        self.config = config
+        super().__init__(config)  # Call parent constructor
         self.name = "GapTrading"
-        
-    def generate_signals(self, data: pd.DataFrame, symbol: str) -> List[Dict]:
+    
+    def get_required_indicators(self) -> List[str]:
+        return ['gap_percent', 'volume_ratio', 'gap_size', 'gap_direction', 'Close', 'Volume', 'Open', 'High', 'Low']
+    
+    def get_min_data_points(self) -> int:
+        return 2  # Need at least 2 days to calculate gaps
+    
+    def generate_signals(self, data: pd.DataFrame, symbol: str) -> List[TradingSignal]:
         """
         Generate gap trading signals
         
@@ -38,12 +47,18 @@ class GapTradingStrategy:
             symbol: Stock symbol
             
         Returns:
-            List of signal dictionaries
+            List of TradingSignal objects (not dicts!)
         """
-        signals = []
+        # Validate data first
+        try:
+            self.validate_data(data)
+        except ValueError:
+            return []
         
-        if len(data) < 2:
-            return signals
+        if len(data) < self.get_min_data_points():
+            return []
+        
+        signals = []
         
         # Get the latest data point
         latest = data.iloc[-1]
@@ -65,15 +80,19 @@ class GapTradingStrategy:
             return signals
         
         # Generate appropriate signal based on gap characteristics
-        signal = self._determine_gap_strategy(latest, gap_classification, data)
+        signal_data = self._determine_gap_strategy(latest, gap_classification, data)
         
-        if signal:
-            signal.update({
-                'symbol': symbol,
-                'date': latest_date,
-                'strategy': self.name,
-                'price': latest['Close'],
-            })
+        if signal_data:
+            # Create TradingSignal object instead of dict
+            signal = TradingSignal(
+                symbol=symbol,
+                signal_type=signal_data['signal_type'],
+                price=float(latest['Close']),
+                confidence=signal_data['confidence'],
+                strategy=self.name,
+                timestamp=latest_date,
+                metadata=signal_data.get('metadata', {})
+            )
             signals.append(signal)
         
         return signals
@@ -91,7 +110,7 @@ class GapTradingStrategy:
         volume_ratio = latest.get('volume_ratio', 1.0)
         
         # Import the classification function from indicators
-        from indicators.technical import TechnicalIndicators
+        from ..indicators.technical import TechnicalIndicators
         return TechnicalIndicators.classify_gap(gap_percent, volume_ratio)
     
     def _is_in_trading_window(self) -> bool:
@@ -167,8 +186,8 @@ class GapTradingStrategy:
         return {
             'signal_type': signal_type,
             'confidence': confidence,
-            'gap_strategy': 'FADE',
-            'metadata': json.dumps({
+            'metadata': {
+                'gap_strategy': 'FADE',
                 'gap_size': gap_classification['gap_size'],
                 'gap_direction': gap_direction,
                 'target_price': target_price,
@@ -176,7 +195,7 @@ class GapTradingStrategy:
                 'volume_ratio': gap_classification['volume_ratio'],
                 'quality': gap_classification['quality'],
                 'strategy_logic': 'gap_fade_mean_reversion'
-            })
+            }
         }
     
     def _gap_continuation_signal(self, latest: pd.Series, gap_classification: Dict, 
@@ -202,8 +221,8 @@ class GapTradingStrategy:
         return {
             'signal_type': signal_type,
             'confidence': confidence,
-            'gap_strategy': 'CONTINUATION',
-            'metadata': json.dumps({
+            'metadata': {
+                'gap_strategy': 'CONTINUATION',
                 'gap_size': gap_classification['gap_size'],
                 'gap_direction': gap_direction,
                 'target_price': target_price,
@@ -211,7 +230,7 @@ class GapTradingStrategy:
                 'volume_ratio': gap_classification['volume_ratio'],
                 'quality': gap_classification['quality'],
                 'strategy_logic': 'gap_continuation_momentum'
-            })
+            }
         }
     
     def _calculate_fade_confidence(self, latest: pd.Series, gap_classification: Dict) -> float:
@@ -272,4 +291,3 @@ class GapTradingStrategy:
             confidence += 0.1
         
         return min(confidence, 1.0)
-    

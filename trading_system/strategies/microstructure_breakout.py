@@ -5,7 +5,10 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import json
 
-class MicrostructureBreakoutStrategy:
+# Import the base strategy classes
+from .base_strategy import TradingStrategy, TradingSignal
+
+class MicrostructureBreakoutStrategy(TradingStrategy):
     """
     Microstructure Breakout Strategy - Precise Breakout Patterns
     

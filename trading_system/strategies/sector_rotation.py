@@ -5,7 +5,10 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import json
 
-class SectorRotationStrategy:
+# Import the base strategy classes
+from .base_strategy import TradingStrategy, TradingSignal
+
+class SectorRotationStrategy(TradingStrategy):
     """
     Sector Rotation Strategy - Momentum-Based Sector ETF Rotation
     

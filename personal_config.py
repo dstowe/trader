@@ -284,7 +284,7 @@ class PersonalTradingConfig:
                 'max_position_percent': cls.MAX_POSITION_VALUE_PERCENT,
                 'min_position_value': cls.MIN_POSITION_VALUE,
                 'max_positions_total': cls.MAX_POSITIONS_TOTAL,
-                'stop_loss_percent': cls.STOP_LOSS_PERCENT,
+                'stop_loss_percent': cls.PERSONAL_STOP_LOSS,
                 'max_daily_loss': cls.MAX_DAILY_LOSS,
             },
             'trading_rules': {
