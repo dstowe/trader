@@ -26,17 +26,16 @@ class PersonalTradingConfig:
     DATABASE_PATH = "trading_data.db"
     
     # Account sizing and risk management
+     # Account sizing and risk management
     ACCOUNT_SIZE = float(os.getenv('ACCOUNT_SIZE', 10000))
     MAX_POSITION_VALUE_PERCENT = 0.5    # 50% max of account per position (AUTHORITATIVE)
     MIN_POSITION_VALUE = 1              # Minimum $1 position
     MAX_POSITIONS_TOTAL = 8             # Maximum 8 total positions (AUTHORITATIVE)
     
-    # Risk management
-    STOP_LOSS_PERCENT = 0.08           # 8% stop loss
-    PERSONAL_STOP_LOSS = 0.08          # Same as above for consistency
+    # Risk management - CONSOLIDATED
+    PERSONAL_STOP_LOSS = 0.08          # 8% stop loss (CONSOLIDATED from STOP_LOSS_PERCENT)
     PERSONAL_TAKE_PROFIT = 0.15        # 15% take profit target
-    MAX_DAILY_LOSS = 0.05              # 5% max daily loss
-    MAX_DAILY_RISK_PERCENT = 0.05      # Same as above for consistency
+    MAX_DAILY_LOSS = 0.05              # 5% max daily loss (CONSOLIDATED from MAX_DAILY_RISK_PERCENT)
     
     # Technical indicators
     BB_PERIOD = 20

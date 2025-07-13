@@ -57,7 +57,7 @@ class BollingerMeanReversionStrategy:
                     'bb_position': (latest['Close'] - latest['bb_lower']) / 
                                   (latest['bb_upper'] - latest['bb_lower']),
                     'rsi': latest['rsi'],
-                    'stop_loss': latest['Close'] * (1 - self.config.STOP_LOSS_PERCENT),
+                    'stop_loss': latest['Close'] * (1 - self.config.PERSONAL_STOP_LOSS),
                     'target': latest['bb_middle']
                 })
             })
