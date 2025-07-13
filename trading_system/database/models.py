@@ -1,4 +1,4 @@
-# database/models.py - UPDATED VERSION
+# database/models.py - UPDATED VERSION WITH CENTRALIZED TABLE CREATION
 import sqlite3
 import pandas as pd
 from datetime import datetime, timedelta
@@ -22,7 +22,7 @@ class DatabaseManager:
             self.connection.close()
     
     def init_database(self):
-        """Initialize database with required tables"""
+        """Initialize database with ALL required tables - CENTRALIZED"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
@@ -90,6 +90,7 @@ class DatabaseManager:
                 )
             ''')
             
+            # Basic position history table
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS position_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,6 +111,31 @@ class DatabaseManager:
                 )
             ''')
             
+            # MOVED FROM automated_system.py - Enhanced position history table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS enhanced_position_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sync_date TEXT NOT NULL,
+                    account_id TEXT NOT NULL,
+                    account_type TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    quantity REAL NOT NULL,
+                    cost_price REAL NOT NULL,
+                    current_price REAL NOT NULL,
+                    market_value REAL NOT NULL,
+                    unrealized_pnl REAL NOT NULL,
+                    pnl_rate REAL NOT NULL,
+                    last_open_time TEXT,
+                    account_value REAL,
+                    settled_funds REAL,
+                    is_fractional INTEGER DEFAULT 0,
+                    is_buy_and_hold INTEGER DEFAULT 0,
+                    enhanced_system INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(sync_date, account_id, symbol)
+                )
+            ''')
+            
             # Market conditions table
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS market_conditions (
@@ -126,6 +152,7 @@ class DatabaseManager:
             ''')
             
             conn.commit()
+            print("✅ All database tables created/verified in centralized location")
     
     def insert_stock_data(self, symbol: str, data: pd.DataFrame):
         """Insert stock price data"""
@@ -223,24 +250,3 @@ class DatabaseManager:
                 ORDER BY entry_date DESC
             '''
             return pd.read_sql_query(query, conn)
-
-# main.py - UPDATED _analyze_market_conditions method
-def _analyze_market_conditions(self):
-    """Analyze current market conditions"""
-    # Get SPY data for market analysis
-    spy_data = self.db.get_stock_data('SPY', 100)
-    
-    if spy_data.empty:
-        print("Warning: No SPY data available, using default conditions")
-        return self.market_analyzer._default_condition()
-    
-    # Get VIX data if available (using VXX as proxy)
-    vix_data = self.db.get_stock_data('VXX', 50)
-    
-    market_condition = self.market_analyzer.analyze_market_condition(
-        spy_data, vix_data if not vix_data.empty else None)
-    
-    # Store market condition using the new method
-    self.db.insert_market_condition(market_condition)
-    
-    return market_condition

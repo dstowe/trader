@@ -602,30 +602,8 @@ class EnhancedAutomatedTradingSystem:
             total_positions_synced = 0
             
             with self.db as conn:
-                # Create enhanced table if not exists
-                conn.execute('''
-                    CREATE TABLE IF NOT EXISTS enhanced_position_history (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        sync_date TEXT NOT NULL,
-                        account_id TEXT NOT NULL,
-                        account_type TEXT NOT NULL,
-                        symbol TEXT NOT NULL,
-                        quantity REAL NOT NULL,
-                        cost_price REAL NOT NULL,
-                        current_price REAL NOT NULL,
-                        market_value REAL NOT NULL,
-                        unrealized_pnl REAL NOT NULL,
-                        pnl_rate REAL NOT NULL,
-                        last_open_time TEXT,
-                        account_value REAL,
-                        settled_funds REAL,
-                        is_fractional INTEGER DEFAULT 0,
-                        is_buy_and_hold INTEGER DEFAULT 0,
-                        enhanced_system INTEGER DEFAULT 1,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(sync_date, account_id, symbol)
-                    )
-                ''')
+                # ✅ Table creation is now handled centrally in DatabaseManager.init_database()
+                # ❌ REMOVED: No need to create table here anymore
                 
                 for account in self.trading_accounts:
                     for pos in account.positions:
@@ -635,8 +613,8 @@ class EnhancedAutomatedTradingSystem:
                         conn.execute('''
                             INSERT OR REPLACE INTO enhanced_position_history 
                             (sync_date, account_id, account_type, symbol, quantity, cost_price, current_price, 
-                             market_value, unrealized_pnl, pnl_rate, last_open_time,
-                             account_value, settled_funds, is_fractional, is_buy_and_hold, enhanced_system)
+                            market_value, unrealized_pnl, pnl_rate, last_open_time,
+                            account_value, settled_funds, is_fractional, is_buy_and_hold, enhanced_system)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
                             sync_date, account.account_id, account.account_type, pos['symbol'], pos['quantity'], 
