@@ -13,8 +13,17 @@ from config.stock_lists import StockLists
 from database.models import DatabaseManager
 from data.webull_client import DataFetcher
 from indicators.technical import TechnicalIndicators
+
+# Import ALL strategies
 from strategies.bollinger_mean_reversion import BollingerMeanReversionStrategy
 from strategies.gap_trading import GapTradingStrategy
+from strategies.bullish_momentum_dip import BullishMomentumDipStrategy
+from strategies.international_strategy import InternationalStrategy
+from strategies.microstructure_breakout import MicrostructureBreakoutStrategy
+from strategies.policy_momentum import PolicyMomentumStrategy
+from strategies.sector_rotation import SectorRotationStrategy
+from strategies.value_rate_strategy import ValueRateStrategy
+
 from ai.market_analyzer import MarketConditionAnalyzer
 
 class TradingSystem:
@@ -27,10 +36,22 @@ class TradingSystem:
         self.market_analyzer = MarketConditionAnalyzer()
         self.indicators = TechnicalIndicators()
         
-        # Initialize strategies
+        # Initialize ALL strategies
         self.strategies = {
             'BollingerMeanReversion': BollingerMeanReversionStrategy(self.config),
-            'GapTrading': GapTradingStrategy(self.config)
+            'GapTrading': GapTradingStrategy(self.config),
+            'BullishMomentumDipStrategy': BullishMomentumDipStrategy(self.config),
+            'BullishMomentumDip': BullishMomentumDipStrategy(self.config),  # Alternative name
+            'InternationalStrategy': InternationalStrategy(self.config),
+            'International': InternationalStrategy(self.config),  # Alternative name
+            'MicrostructureBreakoutStrategy': MicrostructureBreakoutStrategy(self.config),
+            'MicrostructureBreakout': MicrostructureBreakoutStrategy(self.config),  # Alternative name
+            'PolicyMomentumStrategy': PolicyMomentumStrategy(self.config),
+            'PolicyMomentum': PolicyMomentumStrategy(self.config),  # Alternative name
+            'SectorRotationStrategy': SectorRotationStrategy(self.config),
+            'SectorRotation': SectorRotationStrategy(self.config),  # Alternative name
+            'ValueRateStrategy': ValueRateStrategy(self.config),
+            'ValueRate': ValueRateStrategy(self.config)  # Alternative name
         }
         
         self.current_strategy = 'BollingerMeanReversion'
@@ -51,8 +72,14 @@ class TradingSystem:
         # Step 3: Select optimal strategy (with optional override)
         print("3. Selecting optimal strategy...")
         if strategy_override:
-            self.current_strategy = strategy_override
-            print(f"✓ Strategy overridden to: {self.current_strategy}")
+            if strategy_override in self.strategies:
+                self.current_strategy = strategy_override
+                print(f"✅ Strategy overridden to: {self.current_strategy}")
+            else:
+                print(f"❌ Strategy '{strategy_override}' not found!")
+                print(f"Available strategies: {list(self.strategies.keys())}")
+                self.current_strategy = 'BollingerMeanReversion'  # Fallback
+                print(f"Using fallback strategy: {self.current_strategy}")
         else:
             self._select_strategy(market_condition)
         
@@ -75,7 +102,7 @@ class TradingSystem:
             elif stock_list_override == 'BollingerMeanReversion':
                 stock_universe = StockLists.BOLLINGER_MEAN_REVERSION
             elif stock_list_override == 'Core':
-                stock_universe = StockLists.CORE_UNIVERSE
+                stock_universe = StockLists.BOLLINGER_MEAN_REVERSION  # Use this as default for 'Core'
             else:
                 stock_universe = StockLists.GAP_TRADING_UNIVERSE
         elif self.current_strategy == 'GapTrading':
@@ -125,50 +152,50 @@ class TradingSystem:
                 # Cache for gap analysis
                 self.stock_data_cache[symbol] = indicators
                 
-                print(f"✓ Updated data for {symbol}")
+                print(f"✅ Updated data for {symbol}")
     
     def _analyze_market_conditions(self):
-            """Analyze current market conditions with gap environment detection"""
-            # Get SPY data for market analysis
-            spy_data = self.db.get_stock_data('SPY', 100)
-            
-            if spy_data.empty:
-                print("Warning: No SPY data available, using default conditions")
-                return self.market_analyzer._default_condition()
-            
-            # Get actual VIX data (not VXX proxy)
-            vix_data = self.db.get_stock_data('^VIX', 50)
-            
-            # Enhanced market analysis with gap environment detection
-            if self.config.STRATEGY_MODE in ['AUTO', 'FORCE_GAP'] and self.stock_data_cache:
-                market_condition = self.market_analyzer.analyze_market_with_gaps(
-                    spy_data, self.stock_data_cache, self.config, vix_data if not vix_data.empty else None)
-            else:
-                market_condition = self.market_analyzer.analyze_market_condition(
-                    spy_data, vix_data if not vix_data.empty else None)
-            
-            # Override strategy based on STRATEGY_MODE
-            if self.config.STRATEGY_MODE == 'FORCE_BB':
-                market_condition['recommended_strategy'] = 'BollingerMeanReversion'
-            elif self.config.STRATEGY_MODE == 'FORCE_GAP':
-                market_condition['recommended_strategy'] = 'GapTrading'
-            
-            # Store market condition
-            with self.db as conn:
-                conn.execute('''
-                    INSERT OR REPLACE INTO market_conditions 
-                    (date, condition, vix_level, market_trend, recommended_strategy, confidence)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', (
-                    market_condition['date'],
-                    market_condition['condition'],
-                    market_condition['vix_level'],
-                    market_condition['market_trend'],
-                    market_condition['recommended_strategy'],
-                    market_condition['confidence']
-                ))
-            
-            return market_condition
+        """Analyze current market conditions with gap environment detection"""
+        # Get SPY data for market analysis
+        spy_data = self.db.get_stock_data('SPY', 100)
+        
+        if spy_data.empty:
+            print("Warning: No SPY data available, using default conditions")
+            return self.market_analyzer._default_condition()
+        
+        # Get actual VIX data (not VXX proxy)
+        vix_data = self.db.get_stock_data('^VIX', 50)
+        
+        # Enhanced market analysis with gap environment detection
+        if self.config.STRATEGY_MODE in ['AUTO', 'FORCE_GAP'] and self.stock_data_cache:
+            market_condition = self.market_analyzer.analyze_market_with_gaps(
+                spy_data, self.stock_data_cache, self.config, vix_data if not vix_data.empty else None)
+        else:
+            market_condition = self.market_analyzer.analyze_market_condition(
+                spy_data, vix_data if not vix_data.empty else None)
+        
+        # Override strategy based on STRATEGY_MODE
+        if self.config.STRATEGY_MODE == 'FORCE_BB':
+            market_condition['recommended_strategy'] = 'BollingerMeanReversion'
+        elif self.config.STRATEGY_MODE == 'FORCE_GAP':
+            market_condition['recommended_strategy'] = 'GapTrading'
+        
+        # Store market condition
+        with self.db as conn:
+            conn.execute('''
+                INSERT OR REPLACE INTO market_conditions 
+                (date, condition, vix_level, market_trend, recommended_strategy, confidence)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                market_condition['date'],
+                market_condition['condition'],
+                market_condition['vix_level'],
+                market_condition['market_trend'],
+                market_condition['recommended_strategy'],
+                market_condition['confidence']
+            ))
+        
+        return market_condition
     
     def _select_strategy(self, market_condition: dict):
         """Select optimal strategy based on market conditions"""
@@ -176,7 +203,7 @@ class TradingSystem:
         
         if recommended_strategy in self.strategies:
             self.current_strategy = recommended_strategy
-            print(f"✓ Selected strategy: {self.current_strategy}")
+            print(f"✅ Selected strategy: {self.current_strategy}")
         else:
             print(f"⚠ Strategy {recommended_strategy} not available, using {self.current_strategy}")
     
@@ -192,7 +219,7 @@ class TradingSystem:
             elif stock_list_override == 'BollingerMeanReversion':
                 stock_list = StockLists.BOLLINGER_MEAN_REVERSION
             elif stock_list_override == 'Core':
-                stock_list = StockLists.CORE_UNIVERSE
+                stock_list = StockLists.BOLLINGER_MEAN_REVERSION  # Use this as default
             else:
                 stock_list = StockLists.GAP_TRADING_UNIVERSE
         elif self.current_strategy == 'GapTrading':
@@ -200,10 +227,14 @@ class TradingSystem:
         else:
             stock_list = StockLists.BOLLINGER_MEAN_REVERSION
         
+        print(f"🔍 Generating signals for {len(stock_list)} stocks using {self.current_strategy}")
+        
+        signals_found = 0
         for symbol in stock_list:
             # Get data with indicators
             data = self.db.get_stock_data(symbol, 50)
             if data.empty:
+                print(f"❌ No data for {symbol}")
                 continue
             
             # Use appropriate indicator calculation based on strategy
@@ -213,13 +244,22 @@ class TradingSystem:
                 data_with_indicators = self.indicators.calculate_all_indicators(data)
             
             # Generate signals
-            signals = strategy.generate_signals(data_with_indicators, symbol)
-            
-            # Store signals in database
-            for signal in signals:
-                self.db.insert_signal(**signal)
-                all_signals.append(signal)
+            try:
+                signals = strategy.generate_signals(data_with_indicators, symbol)
+                
+                if signals:
+                    print(f"📈 {symbol}: Found {len(signals)} signals")
+                    signals_found += len(signals)
+                
+                # Store signals in database
+                for signal in signals:
+                    self.db.insert_signal(**signal)
+                    all_signals.append(signal)
+                    
+            except Exception as e:
+                print(f"❌ Error generating signals for {symbol}: {e}")
         
+        print(f"📊 Total signals found: {signals_found}")
         return all_signals
     
     def _fetch_market_data(self, symbols):
@@ -287,8 +327,9 @@ class TradingSystem:
                     strategy_info = ""
                     if 'gap_strategy' in signal:
                         strategy_info = f" [{signal['gap_strategy']}]"
+                    confidence = signal.get('confidence', 0)
                     print(f"  • {signal['symbol']}: ${signal['price']:.2f} "
-                          f"(Confidence: {signal['confidence']:.2f}){strategy_info}")
+                          f"(Confidence: {confidence:.2f}){strategy_info}")
             
             if sell_signals:
                 print(f"\n💸 SELL SIGNALS ({len(sell_signals)}):")
@@ -296,8 +337,9 @@ class TradingSystem:
                     strategy_info = ""
                     if 'gap_strategy' in signal:
                         strategy_info = f" [{signal['gap_strategy']}]"
+                    confidence = signal.get('confidence', 0)
                     print(f"  • {signal['symbol']}: ${signal['price']:.2f} "
-                          f"(Confidence: {signal['confidence']:.2f}){strategy_info}")
+                          f"(Confidence: {confidence:.2f}){strategy_info}")
         else:
             print("\n📭 No trading signals generated")
         

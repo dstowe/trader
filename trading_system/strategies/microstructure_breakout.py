@@ -70,21 +70,27 @@ class MicrostructureBreakoutStrategy:
             confidence = self._calculate_confidence(latest, data, 'BUY', symbol)
             atr_stop = latest['Close'] - (latest.get('atr', latest['Close'] * 0.02) * self.ATR_MULTIPLIER)
             
+            # Convert all values to JSON-serializable types
+            breakout_level = float(self._get_breakout_level(data))
+            volume_spike = float(self._get_volume_ratio(data))
+            atr_value = float(latest.get('atr', 0))
+            spread_quality = str(self._estimate_spread_quality(symbol))
+            
             signals.append({
                 'symbol': symbol,
                 'date': latest_date,
                 'strategy': self.name,
                 'signal_type': 'BUY',
-                'price': latest['Close'],
-                'confidence': confidence,
-                'reason': 'microstructure_breakout',
+                'price': float(latest['Close']),
+                'confidence': float(confidence),
                 'metadata': json.dumps({
-                    'breakout_level': self._get_breakout_level(data),
-                    'volume_spike': self._get_volume_ratio(data),
-                    'atr': latest.get('atr', 0),
-                    'atr_stop': atr_stop,
-                    'spread_quality': self._estimate_spread_quality(symbol),
-                    'stop_loss': atr_stop,
+                    'reason': 'microstructure_breakout',
+                    'breakout_level': breakout_level,
+                    'volume_spike': volume_spike,
+                    'atr': atr_value,
+                    'atr_stop': float(atr_stop),
+                    'spread_quality': spread_quality,
+                    'stop_loss': float(atr_stop),
                     'strategy_logic': 'microstructure_breakout'
                 })
             })
@@ -93,17 +99,22 @@ class MicrostructureBreakoutStrategy:
         sell_signal = self._check_breakout_sell_signal(latest, data, symbol)
         if sell_signal:
             confidence = self._calculate_confidence(latest, data, 'SELL', symbol)
+            
+            # Convert all values to JSON-serializable types
+            volume_exhaustion = bool(self._check_volume_exhaustion(data))
+            support_break = bool(self._check_support_break(data))
+            
             signals.append({
                 'symbol': symbol,
                 'date': latest_date,
                 'strategy': self.name,
                 'signal_type': 'SELL',
-                'price': latest['Close'],
-                'confidence': confidence,
-                'reason': 'breakout_exhaustion_or_reversal',
+                'price': float(latest['Close']),
+                'confidence': float(confidence),
                 'metadata': json.dumps({
-                    'volume_exhaustion': self._check_volume_exhaustion(data),
-                    'support_break': self._check_support_break(data)
+                    'reason': 'breakout_exhaustion_or_reversal',
+                    'volume_exhaustion': volume_exhaustion,
+                    'support_break': support_break
                 })
             })
         
@@ -158,11 +169,11 @@ class MicrostructureBreakoutStrategy:
     def _get_breakout_level(self, data: pd.DataFrame) -> float:
         """Get the breakout resistance level"""
         if len(data) < self.BREAKOUT_LOOKBACK:
-            return data['High'].iloc[-1]
+            return float(data['High'].iloc[-1])
         
         # 20-day high as resistance level
         resistance = data['High'].tail(self.BREAKOUT_LOOKBACK).max()
-        return resistance
+        return float(resistance)
     
     def _get_volume_ratio(self, data: pd.DataFrame) -> float:
         """Get current volume vs average volume ratio"""
@@ -172,7 +183,7 @@ class MicrostructureBreakoutStrategy:
         current_volume = data['Volume'].iloc[-1]
         avg_volume = data['Volume'].tail(10).mean()
         
-        return current_volume / avg_volume if avg_volume > 0 else 1.0
+        return float(current_volume / avg_volume if avg_volume > 0 else 1.0)
     
     def _check_breakout_buy_signal(self, latest: pd.Series, data: pd.DataFrame, symbol: str) -> bool:
         """Check for breakout buy conditions"""
@@ -293,7 +304,7 @@ class MicrostructureBreakoutStrategy:
     def calculate_position_size(self, account_value: float, price: float) -> int:
         """Calculate position size for microstructure breakout plays"""
         # Standard position sizing
-        max_position_value = account_value * self.config.MAX_POSITION_VALUE_PERCENT
+        max_position_value = account_value * getattr(self.config, 'MAX_POSITION_VALUE_PERCENT', 0.1)
         
         shares = int(max_position_value / price)
         return max(shares, 1) if shares > 0 else 0

@@ -21,7 +21,7 @@ class PersonalTradingConfig(TradingConfig):
     
     # Position Management
     MAX_POSITION_VALUE_PERCENT = 0.5  # 50% max of account per position
-    MIN_POSITION_VALUE = 5          # Minimum $5 position
+    MIN_POSITION_VALUE = 1          # Minimum $5 position
     MAX_POSITIONS_TOTAL = 8            # Maximum 8 total positions
     
     # Risk Management (Personal)

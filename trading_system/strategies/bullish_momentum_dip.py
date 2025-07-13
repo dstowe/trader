@@ -75,22 +75,30 @@ class BullishMomentumDipStrategy:
         buy_signal = self._check_momentum_dip_buy_signal(latest, data, symbol)
         if buy_signal:
             confidence = self._calculate_confidence(latest, data, 'BUY', symbol)
+            
+            # Convert all values to JSON-serializable types
+            momentum_20d = float(self._calculate_momentum(data, 20))
+            momentum_50d = float(self._calculate_momentum(data, 50))
+            pullback = float(self._calculate_pullback_from_high(data))
+            trend_strength = float(self._calculate_trend_strength(data))
+            volume_confirmation = bool(self._check_volume_confirmation(data))
+            
             signals.append({
                 'symbol': symbol,
                 'date': latest_date,
                 'strategy': self.name,
                 'signal_type': 'BUY',
-                'price': latest['Close'],
-                'confidence': confidence,
-                'reason': 'bullish_momentum_dip_opportunity',
+                'price': float(latest['Close']),
+                'confidence': float(confidence),
                 'metadata': json.dumps({
-                    'momentum_20d': self._calculate_momentum(data, 20),
-                    'momentum_50d': self._calculate_momentum(data, 50),
-                    'pullback_from_high': self._calculate_pullback_from_high(data),
-                    'trend_strength': self._calculate_trend_strength(data),
-                    'rsi_level': latest.get('rsi', 50),
-                    'volume_confirmation': self._check_volume_confirmation(data),
-                    'stop_loss': latest['Close'] * (1 - 0.06),  # 6% stop loss
+                    'reason': 'bullish_momentum_dip_opportunity',
+                    'momentum_20d': momentum_20d,
+                    'momentum_50d': momentum_50d,
+                    'pullback_from_high': pullback,
+                    'trend_strength': trend_strength,
+                    'rsi_level': float(latest.get('rsi', 50)),
+                    'volume_confirmation': volume_confirmation,  # Now explicitly bool
+                    'stop_loss': float(latest['Close'] * 0.94),  # 6% stop loss
                     'strategy_logic': 'bullish_momentum_dip_entry'
                 })
             })
@@ -99,18 +107,24 @@ class BullishMomentumDipStrategy:
         sell_signal = self._check_momentum_sell_signal(latest, data, symbol)
         if sell_signal:
             confidence = self._calculate_confidence(latest, data, 'SELL', symbol)
+            
+            # Convert all values to JSON-serializable types
+            momentum_exhausted = bool(latest.get('rsi', 50) > self.RSI_EXIT)
+            trend_broken = bool(self._check_trend_break(data))
+            market_bearish = bool(market_condition == 'BEARISH')
+            
             signals.append({
                 'symbol': symbol,
                 'date': latest_date,
                 'strategy': self.name,
                 'signal_type': 'SELL',
-                'price': latest['Close'],
-                'confidence': confidence,
-                'reason': 'momentum_exhaustion_or_trend_break',
+                'price': float(latest['Close']),
+                'confidence': float(confidence),
                 'metadata': json.dumps({
-                    'momentum_exhausted': latest.get('rsi', 50) > self.RSI_EXIT,
-                    'trend_broken': self._check_trend_break(data),
-                    'market_bearish': market_condition == 'BEARISH'
+                    'reason': 'momentum_exhaustion_or_trend_break',
+                    'momentum_exhausted': momentum_exhausted,
+                    'trend_broken': trend_broken,
+                    'market_bearish': market_bearish
                 })
             })
         
@@ -358,7 +372,7 @@ class BullishMomentumDipStrategy:
     def calculate_position_size(self, account_value: float, price: float) -> int:
         """Calculate position size for momentum dip plays"""
         # Momentum strategies can be more aggressive with position sizing
-        max_position_value = account_value * self.config.MAX_POSITION_VALUE_PERCENT
+        max_position_value = account_value * getattr(self.config, 'MAX_POSITION_VALUE_PERCENT', 0.1)
         
         # Slight bonus for high-confidence momentum plays
         max_position_value *= 1.1  # 10% bonus
