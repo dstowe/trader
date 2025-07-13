@@ -1,12 +1,9 @@
-# automated_system.py (Enhanced with Strategy Override Support)
+# automated_system.py - REFACTORED: Single Source of Truth Integration
 """
-Enhanced Automated Multi-Account Personal Trading System
-Now includes strategy override support from PersonalTradingConfig
-Fully integrated with PersonalTradingConfig for consistent rule enforcement
-Runs daily at configured trading hours via Windows Task Scheduler
-No user interaction required - respects all personal trading preferences
-
-Enhanced version with strategy override capabilities
+Enhanced Automated Multi-Account Personal Trading System - REFACTORED
+Now uses PersonalTradingConfig as the ONLY source of configuration truth
+All duplicate configuration logic removed - PersonalTradingConfig is authoritative
+Simplified and streamlined for better maintainability
 """
 
 import sys
@@ -26,21 +23,23 @@ from trading_system.webull.webull import webull
 from trading_system.database.models import DatabaseManager
 from trading_system.auth import CredentialManager, LoginManager, SessionManager
 from trading_system.accounts import AccountManager, AccountInfo
+
+# SINGLE SOURCE OF TRUTH: PersonalTradingConfig
 from personal_config import PersonalTradingConfig
 
 class EnhancedAutomatedTradingSystem:
     """
-    Enhanced Automated Multi-Account Trading System
-    Now with configurable strategy override support from PersonalTradingConfig
-    Fully integrated with PersonalTradingConfig for complete consistency
-    Now with modular authentication and account management
+    Enhanced Automated Multi-Account Trading System - REFACTORED
+    Now uses PersonalTradingConfig as the SINGLE SOURCE OF TRUTH for ALL configuration
+    No competing configuration logic - everything defers to PersonalTradingConfig
     """
     
     def __init__(self):
-        # Use PersonalTradingConfig as the single source of truth
+        # SINGLE SOURCE OF TRUTH: Use PersonalTradingConfig for ALL configuration
         self.config = PersonalTradingConfig()
         self.wb = webull()
-        self.trading_system = TradingSystem()
+        # FIXED: Pass PersonalTradingConfig to TradingSystem to ensure single source of truth
+        self.trading_system = TradingSystem(config=self.config)
         self.db = DatabaseManager(self.config.DATABASE_PATH)
         
         # Setup logging
@@ -51,14 +50,14 @@ class EnhancedAutomatedTradingSystem:
         self.login_manager = LoginManager(self.wb, self.credential_manager, self.logger)
         self.session_manager = SessionManager(logger=self.logger)
         
-        # Account management with config integration
+        # Account management with PersonalTradingConfig integration
         self.account_manager = AccountManager(self.wb, self.config, self.logger)
         self.trading_accounts = []  # Enabled accounts for trading
         
         # Trading state
         self.is_logged_in = False
         
-        # Safety checks - now using PersonalTradingConfig values
+        # Safety checks - ALL values now from PersonalTradingConfig
         self.today = datetime.now().date()
         
         # Trade tracking for day trading detection
@@ -66,11 +65,11 @@ class EnhancedAutomatedTradingSystem:
         self.trade_log_file = "enhanced_automated_trades.json"
         self.load_todays_trades()
         
-        # Load rule enforcement summary (reduced to DEBUG level)
+        # Load configuration summaries (using PersonalTradingConfig methods)
         self.rule_summary = self.config.get_rule_enforcement_summary()
         self.logger.debug(f"🛡️ Rule Enforcement Active: {self.rule_summary}")
         
-        # NEW: Load automated system configuration
+        # Load automated system configuration (AUTHORITATIVE from PersonalTradingConfig)
         self.automated_config = self.config.get_automated_system_summary()
         self.logger.info(f"🤖 Automated System Config: {self.automated_config}")
         
@@ -202,7 +201,7 @@ class EnhancedAutomatedTradingSystem:
     
     def check_market_hours(self):
         """Check if we're in trading hours using PersonalTradingConfig"""
-        # Use PersonalTradingConfig trading hours instead of hardcoded values
+        # Use PersonalTradingConfig method (SINGLE SOURCE OF TRUTH)
         if not self.config.is_market_hours():
             current_time = datetime.now().strftime("%H:%M")
             self.logger.info(f"Not running - outside configured trading hours")
@@ -221,36 +220,36 @@ class EnhancedAutomatedTradingSystem:
         return True
     
     def check_safety_limits_for_accounts(self):
-        """Enhanced safety checks using PersonalTradingConfig limits"""
+        """Enhanced safety checks using PersonalTradingConfig limits (SINGLE SOURCE OF TRUTH)"""
         safety_issues = []
         
         total_trades_today = len(self.todays_trades)
         total_accounts = len(self.trading_accounts)
         
-        # Use PersonalTradingConfig max positions instead of hardcoded values
+        # Use PersonalTradingConfig values (AUTHORITATIVE)
         max_total_trades = self.config.MAX_POSITIONS_TOTAL * total_accounts
         
         # Check total daily trade limit across all accounts
         if total_trades_today >= max_total_trades:
             safety_issues.append(f"Total daily trade limit reached: {total_trades_today}/{max_total_trades} across all accounts")
         
-        # Check each account individually
+        # Check each account individually using PersonalTradingConfig
         for account in self.trading_accounts:
             account_trades_today = len([t for t in self.todays_trades if t.get('account_id') == account.account_id])
             
-            # Check per-account trade limit using PersonalTradingConfig
+            # Check per-account trade limit using PersonalTradingConfig (AUTHORITATIVE)
             if account_trades_today >= self.config.MAX_POSITIONS_TOTAL:
                 safety_issues.append(f"{account.account_type}: Daily trade limit reached ({account_trades_today}/{self.config.MAX_POSITIONS_TOTAL})")
             
-            # Check minimum account value using PersonalTradingConfig
+            # Check minimum account value using PersonalTradingConfig (AUTHORITATIVE)
             if account.net_liquidation < self.config.MIN_POSITION_VALUE:
                 safety_issues.append(f"{account.account_type}: Account value too low (${account.net_liquidation:.2f} < ${self.config.MIN_POSITION_VALUE})")
             
-            # Check settled funds using PersonalTradingConfig
+            # Check settled funds using PersonalTradingConfig (AUTHORITATIVE)
             if account.settled_funds < self.config.MIN_FRACTIONAL_ORDER:
                 safety_issues.append(f"{account.account_type}: Insufficient settled funds (${account.settled_funds:.2f} < ${self.config.MIN_FRACTIONAL_ORDER})")
         
-        # Calculate combined available funds using PersonalTradingConfig method
+        # Calculate combined available funds using PersonalTradingConfig method (AUTHORITATIVE)
         total_available = sum(min(
             account.net_liquidation * self.config.MAX_POSITION_VALUE_PERCENT,
             account.settled_funds
@@ -272,7 +271,7 @@ class EnhancedAutomatedTradingSystem:
             return True
     
     def get_combined_scan_universe(self) -> List[str]:
-        """Get combined scan universe using PersonalTradingConfig method"""
+        """Get combined scan universe using PersonalTradingConfig method (SINGLE SOURCE OF TRUTH)"""
         all_position_symbols = set()
         total_settled_funds = 0.0
         
@@ -281,7 +280,7 @@ class EnhancedAutomatedTradingSystem:
             all_position_symbols.update(position_symbols)
             total_settled_funds += account.settled_funds
         
-        # Use PersonalTradingConfig method with combined data and current VIX estimate
+        # Use PersonalTradingConfig method (AUTHORITATIVE)
         vix_level = 20  # Could be enhanced to get real VIX data
         scan_universe = self.config.get_personal_scan_universe(
             account_positions=list(all_position_symbols),
@@ -292,12 +291,12 @@ class EnhancedAutomatedTradingSystem:
         return scan_universe
     
     def filter_signals_for_account(self, signals: List[Dict], account: AccountInfo) -> List[Dict]:
-        """Filter signals for specific account using PersonalTradingConfig rule enforcement"""
+        """Filter signals for specific account using PersonalTradingConfig rule enforcement (SINGLE SOURCE OF TRUTH)"""
         filtered_signals = []
         position_symbols = [pos['symbol'] for pos in account.positions]
         account_trades = [t for t in self.todays_trades if t.get('account_id') == account.account_id]
         
-        # Check per-account trade limit using PersonalTradingConfig
+        # Check per-account trade limit using PersonalTradingConfig (AUTHORITATIVE)
         if len(account_trades) >= self.config.MAX_POSITIONS_TOTAL:
             self.logger.debug(f"🚫 {account.account_type}: Daily trade limit reached ({len(account_trades)}/{self.config.MAX_POSITIONS_TOTAL})")
             return []
@@ -306,7 +305,7 @@ class EnhancedAutomatedTradingSystem:
             symbol = signal['symbol']
             signal_type = signal['signal_type']
             
-            # Use PersonalTradingConfig comprehensive signal validation
+            # Use PersonalTradingConfig comprehensive signal validation (AUTHORITATIVE)
             should_execute, reason = self.config.should_execute_signal(
                 signal, 
                 current_positions=position_symbols,
@@ -318,12 +317,12 @@ class EnhancedAutomatedTradingSystem:
                 self.logger.debug(f"⚠️ {account.account_type}: Filtered {symbol} - {reason}")
                 continue
             
-            # Check buy-and-hold protection from PersonalTradingConfig
+            # Check buy-and-hold protection from PersonalTradingConfig (AUTHORITATIVE)
             if symbol in self.config.BUY_AND_HOLD_POSITIONS and signal_type == 'SELL':
                 self.logger.debug(f"🚨 {account.account_type}: BUY-AND-HOLD PROTECTION for {symbol}")
                 continue
             
-            # Position sizing for BUY signals using PersonalTradingConfig method
+            # Position sizing for BUY signals using PersonalTradingConfig method (AUTHORITATIVE)
             if signal_type == 'BUY':
                 position_info = self.config.get_position_size(
                     signal['price'], 
@@ -360,7 +359,7 @@ class EnhancedAutomatedTradingSystem:
                     self.logger.error(f"❌ Failed to switch to {account.account_type}")
                     return False
                 
-                # Calculate position sizing using PersonalTradingConfig
+                # Calculate position sizing using PersonalTradingConfig (AUTHORITATIVE)
                 if signal_type == 'BUY':
                     if 'calculated_position_info' in signal:
                         position_info = signal['calculated_position_info']
@@ -395,8 +394,8 @@ class EnhancedAutomatedTradingSystem:
                     
                     quantity = position['quantity']
                 
-                # Execute the order using PersonalTradingConfig order type
-                order_type = getattr(self.config, 'FRACTIONAL_ORDER_TYPE', 'LMT')
+                # Execute the order using PersonalTradingConfig order type (AUTHORITATIVE)
+                order_type = self.config.FRACTIONAL_ORDER_TYPE
                 self.logger.info(f"Placing {signal_type} order: {quantity} shares of {symbol} on {account.account_type} ({order_type})")
                 
                 order_result = self.wb.place_order(
@@ -619,14 +618,17 @@ class EnhancedAutomatedTradingSystem:
             self.logger.error(f"Error syncing enhanced positions: {e}")
     
     def run_enhanced_automated_analysis(self):
-        """Enhanced automated analysis with strategy override support"""
+        """Enhanced automated analysis with PersonalTradingConfig as SINGLE SOURCE OF TRUTH"""
         start_time = datetime.now()
         
         try:
-            self.logger.info("🛡️ ENHANCED AUTOMATED MULTI-ACCOUNT TRADING SYSTEM")
+            self.logger.info("🛡️ ENHANCED AUTOMATED MULTI-ACCOUNT TRADING SYSTEM - REFACTORED")
             self.logger.info("=" * 80)
             
-            # NEW: Log automated system configuration
+            # Log that we're using PersonalTradingConfig as single source of truth
+            self.logger.info(f"🔧 Configuration: Using {type(self.config).__name__} as SINGLE SOURCE OF TRUTH")
+            
+            # Log automated system configuration (from PersonalTradingConfig - AUTHORITATIVE)
             self.logger.info(f"🤖 Strategy Mode: {self.automated_config['mode']}")
             if self.automated_config['strategy_override']:
                 self.logger.info(f"🎯 Forced Strategy: {self.automated_config['strategy_override']}")
@@ -636,6 +638,8 @@ class EnhancedAutomatedTradingSystem:
             self.logger.info(f"🔄 Enable Retry: {self.automated_config['enable_retry']}")
             self.logger.info(f"🛡️ Fallback Strategy: {self.automated_config['fallback_strategy']}")
             
+            # Log all configuration from PersonalTradingConfig (SINGLE SOURCE OF TRUTH)
+            config_summary = self.config.get_all_config_summary()
             self.logger.info(f"📋 Enhanced Rules: Short Selling {self.config.ALLOW_SHORT_SELLING} | Day Trading {self.config.ALLOW_DAY_TRADING}")
             self.logger.info(f"📅 Analysis Date: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
             self.logger.info(f"⏰ Trading Hours: {self.config.TRADING_START_TIME} - {self.config.TRADING_END_TIME}")
@@ -643,7 +647,7 @@ class EnhancedAutomatedTradingSystem:
             self.logger.info(f"💰 Min Position: ${self.config.MIN_POSITION_VALUE}")
             self.logger.info(f"📊 Max Positions: {self.config.MAX_POSITIONS_TOTAL}")
             
-            # Pre-flight safety checks using PersonalTradingConfig
+            # Pre-flight safety checks using PersonalTradingConfig (SINGLE SOURCE OF TRUTH)
             if not self.check_market_hours():
                 self.logger.info("✅ Enhanced system ran successfully - market not open")
                 return True  # Not an error condition
@@ -658,19 +662,19 @@ class EnhancedAutomatedTradingSystem:
                 self.logger.error("❌ CRITICAL: Failed to setup trading accounts")
                 return False
             
-            # Step 3: Enhanced safety checks using PersonalTradingConfig
+            # Step 3: Enhanced safety checks using PersonalTradingConfig (SINGLE SOURCE OF TRUTH)
             self.logger.info("🛡️ Step 3: Running enhanced safety checks...")
             if not self.check_safety_limits_for_accounts():
                 self.logger.warning("⚠️ Enhanced safety limits not met - system will not trade today")
                 self.logger.info("✅ Enhanced system ran successfully - safety limits prevented trading")
                 return True  # Not an error condition
             
-            # Log enhanced combined status
+            # Log enhanced combined status using PersonalTradingConfig methods
             total_value = sum(account.net_liquidation for account in self.trading_accounts)
             total_funds = sum(account.settled_funds for account in self.trading_accounts)
             total_positions = sum(len(account.positions) for account in self.trading_accounts)
             
-            # Get fractional capability info
+            # Get fractional capability info from PersonalTradingConfig (AUTHORITATIVE)
             fractional_info = self.config.get_fractional_capability_info(total_value, total_funds)
             
             self.logger.info("📊 Enhanced Combined Account Status:")
@@ -682,7 +686,7 @@ class EnhancedAutomatedTradingSystem:
             self.logger.info(f"   📊 Fractional Enabled: {fractional_info['fractional_enabled']}")
             self.logger.info(f"   💸 Min Order Amount: ${fractional_info['min_order_amount']}")
             
-            # Step 4: Build scan universe using PersonalTradingConfig
+            # Step 4: Build scan universe using PersonalTradingConfig (SINGLE SOURCE OF TRUTH)
             self.logger.info("🔍 Step 4: Building enhanced scan universe...")
             scan_universe = self.get_combined_scan_universe()
             self.logger.info(f"   📈 Scanning {len(scan_universe)} stocks using PersonalTradingConfig preferences")
@@ -691,10 +695,10 @@ class EnhancedAutomatedTradingSystem:
                 self.logger.warning("⚠️ No stocks in enhanced scan universe - nothing to analyze")
                 return True
             
-            # Step 5: Run trading system analysis with enhanced strategy override support
-            self.logger.info("🤖 Step 5: Running enhanced market analysis with strategy overrides...")
+            # Step 5: Run trading system analysis with strategy override from PersonalTradingConfig (SINGLE SOURCE OF TRUTH)
+            self.logger.info("🤖 Step 5: Running enhanced market analysis...")
             
-            # NEW: Get strategy and stock list overrides from PersonalTradingConfig
+            # Get strategy and stock list overrides from PersonalTradingConfig (AUTHORITATIVE)
             strategy_override, stock_list_override = self.config.get_automated_strategy_override()
             
             if strategy_override:
@@ -717,7 +721,7 @@ class EnhancedAutomatedTradingSystem:
                         StockLists.BOLLINGER_MEAN_REVERSION = scan_universe
                         StockLists.GAP_TRADING = scan_universe
                         
-                        # NEW: Pass strategy and stock list overrides to run_daily_analysis
+                        # Pass strategy and stock list overrides to run_daily_analysis
                         results = self.trading_system.run_daily_analysis(
                             strategy_override=strategy_override,
                             stock_list_override=stock_list_override
@@ -743,7 +747,7 @@ class EnhancedAutomatedTradingSystem:
                         self.logger.error("❌ CRITICAL: Enhanced market analysis failed after all retries")
                         return False
             
-            # Step 6: Process and distribute signals with PersonalTradingConfig rule enforcement
+            # Step 6: Process and distribute signals with PersonalTradingConfig rule enforcement (SINGLE SOURCE OF TRUTH)
             self.logger.info("📋 Step 6: Processing signals with enhanced rule enforcement...")
             all_signals = results['buy_signals'] + results['sell_signals']
             
@@ -757,7 +761,7 @@ class EnhancedAutomatedTradingSystem:
                 self.sync_all_positions_to_db()
                 return True
             
-            # Enhanced signal processing with PersonalTradingConfig
+            # Enhanced signal processing with PersonalTradingConfig (SINGLE SOURCE OF TRUTH)
             executed_trades = 0
             total_rule_violations = 0
             confidence_filtered = 0
@@ -767,13 +771,13 @@ class EnhancedAutomatedTradingSystem:
                 self.logger.debug(f"\n📊 Signal {i}/{len(all_signals)}: {signal['signal_type']} {signal['symbol']} @ ${signal['price']:.2f}")
                 self.logger.debug(f"   Confidence: {signal.get('confidence', 0):.1%}")
                 
-                # Check minimum confidence using PersonalTradingConfig
+                # Check minimum confidence using PersonalTradingConfig (AUTHORITATIVE)
                 if signal.get('confidence', 0) < self.config.MIN_SIGNAL_CONFIDENCE:
                     self.logger.debug(f"   ❌ Below minimum confidence threshold ({self.config.MIN_SIGNAL_CONFIDENCE:.1%})")
                     confidence_filtered += 1
                     continue
                 
-                # Check buy-and-hold protection
+                # Check buy-and-hold protection using PersonalTradingConfig (AUTHORITATIVE)
                 if (signal['symbol'] in self.config.BUY_AND_HOLD_POSITIONS and 
                     signal['signal_type'] == 'SELL'):
                     self.logger.debug(f"   🛡️ BUY-AND-HOLD PROTECTION: {signal['symbol']}")
@@ -793,7 +797,7 @@ class EnhancedAutomatedTradingSystem:
                     self.logger.debug("🚨 No accounts can execute this signal due to enhanced rule violations")
                     continue
                 
-                # Automatically select best account using PersonalTradingConfig logic
+                # Automatically select best account using enhanced logic
                 if len(suitable_accounts) > 1:
                     best_account = max(suitable_accounts, key=lambda a: a.settled_funds)
                     self.logger.info(f"   🎯 Auto-selected: {best_account.account_type} (${best_account.settled_funds:.2f} available)")
@@ -825,7 +829,7 @@ class EnhancedAutomatedTradingSystem:
             self.sync_all_positions_to_db()
             
             self.logger.info("="*80)
-            self.logger.info("✅ ENHANCED AUTOMATED MULTI-ACCOUNT ANALYSIS COMPLETE")
+            self.logger.info("✅ ENHANCED AUTOMATED MULTI-ACCOUNT ANALYSIS COMPLETE - REFACTORED")
             self.logger.info("="*80)
             self.logger.info(f"📊 Enhanced Execution Summary:")
             self.logger.info(f"   ⏱️ Duration: {duration.total_seconds():.1f} seconds")
@@ -842,7 +846,7 @@ class EnhancedAutomatedTradingSystem:
             self.logger.info(f"   🛡️ Buy-and-Hold Protected: {buy_and_hold_protected}")
             self.logger.info(f"   📊 Daily Trade Count: {len(self.todays_trades)} across all accounts")
             
-            # Final enhanced account status
+            # Final enhanced account status using PersonalTradingConfig methods
             self.logger.info(f"📊 Final Enhanced Multi-Account Status:")
             for account in self.trading_accounts:
                 account_trades = len([t for t in self.todays_trades if t.get('account_id') == account.account_id])
@@ -866,10 +870,7 @@ class EnhancedAutomatedTradingSystem:
             self.logger.error(f"❌ CRITICAL ENHANCED SYSTEM ERROR: {e}")
             self.logger.error("📋 Full error details:", exc_info=True)
             return False
-        
-        # finally:
-        #     # Always try to logout for security
-        #     self.login_manager.logout()
+
 
 def setup_credentials():
     """One-time setup to encrypt and store credentials using new modular system"""
@@ -877,7 +878,7 @@ def setup_credentials():
     return setup_credentials_interactive()
 
 def main():
-    """Main entry point for enhanced automated system with strategy override support"""
+    """Main entry point for enhanced automated system - REFACTORED with PersonalTradingConfig as SINGLE SOURCE OF TRUTH"""
     try:
         system = EnhancedAutomatedTradingSystem()
         success = system.run_enhanced_automated_analysis()

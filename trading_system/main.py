@@ -1,4 +1,4 @@
-# main.py
+# trading_system/main.py - FIXED to accept config parameter
 import sys
 import os
 from datetime import datetime, timedelta
@@ -8,7 +8,7 @@ import time
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config.settings import TradingConfig
+from config.settings import TradingConfig  # Keep for backward compatibility
 from config.stock_lists import StockLists
 from database.models import DatabaseManager
 from data.webull_client import DataFetcher
@@ -27,16 +27,20 @@ from strategies.value_rate_strategy import ValueRateStrategy
 from ai.market_analyzer import MarketConditionAnalyzer
 
 class TradingSystem:
-    """Main trading system orchestrator"""
+    """Main trading system orchestrator - FIXED to use injected config"""
     
-    def __init__(self):
-        self.config = TradingConfig()
+    def __init__(self, config=None):
+        # FIXED: Accept config parameter or use default
+        # This allows automated_system.py to inject PersonalTradingConfig
+        # while maintaining backward compatibility
+        self.config = config if config is not None else TradingConfig()
+        
         self.db = DatabaseManager(self.config.DATABASE_PATH)
         self.data_fetcher = DataFetcher()
         self.market_analyzer = MarketConditionAnalyzer()
         self.indicators = TechnicalIndicators()
         
-        # Initialize ALL strategies
+        # Initialize ALL strategies with the injected config
         self.strategies = {
             'BollingerMeanReversion': BollingerMeanReversionStrategy(self.config),
             'GapTrading': GapTradingStrategy(self.config),
@@ -60,6 +64,7 @@ class TradingSystem:
     def run_daily_analysis(self, strategy_override=None, stock_list_override=None):
         """Run the complete daily trading analysis"""
         print(f"Starting daily analysis at {datetime.now()}")
+        print(f"Using config: {type(self.config).__name__}")  # Debug: show which config is being used
         
         # Step 1: Fetch market data
         print("1. Fetching market data...")
@@ -126,9 +131,12 @@ class TradingSystem:
         base_stock_list = StockLists.BOLLINGER_MEAN_REVERSION
         
         # Determine which stock universe to use based on strategy mode
-        if self.config.STRATEGY_MODE == 'FORCE_GAP':
+        # Check if config has STRATEGY_MODE (could be PersonalTradingConfig or base TradingConfig)
+        strategy_mode = getattr(self.config, 'STRATEGY_MODE', 'AUTO')
+        
+        if strategy_mode == 'FORCE_GAP':
             stock_list = StockLists.GAP_TRADING_UNIVERSE
-        elif self.config.STRATEGY_MODE == 'AUTO':
+        elif strategy_mode == 'AUTO':
             # For AUTO mode, fetch full universe to enable gap detection
             stock_list = StockLists.GAP_TRADING_UNIVERSE
         else:
@@ -167,7 +175,9 @@ class TradingSystem:
         vix_data = self.db.get_stock_data('^VIX', 50)
         
         # Enhanced market analysis with gap environment detection
-        if self.config.STRATEGY_MODE in ['AUTO', 'FORCE_GAP'] and self.stock_data_cache:
+        strategy_mode = getattr(self.config, 'STRATEGY_MODE', 'AUTO')
+        
+        if strategy_mode in ['AUTO', 'FORCE_GAP'] and self.stock_data_cache:
             market_condition = self.market_analyzer.analyze_market_with_gaps(
                 spy_data, self.stock_data_cache, self.config, vix_data if not vix_data.empty else None)
         else:
@@ -175,9 +185,9 @@ class TradingSystem:
                 spy_data, vix_data if not vix_data.empty else None)
         
         # Override strategy based on STRATEGY_MODE
-        if self.config.STRATEGY_MODE == 'FORCE_BB':
+        if strategy_mode == 'FORCE_BB':
             market_condition['recommended_strategy'] = 'BollingerMeanReversion'
-        elif self.config.STRATEGY_MODE == 'FORCE_GAP':
+        elif strategy_mode == 'FORCE_GAP':
             market_condition['recommended_strategy'] = 'GapTrading'
         
         # Store market condition
@@ -295,7 +305,7 @@ class TradingSystem:
         print(f"📉 VIX Level: {market_condition['vix_level']:.2f}")
         print(f"🎯 Recommended Strategy: {market_condition['recommended_strategy']}")
         print(f"🔍 Confidence: {market_condition['confidence']:.2f}")
-        print(f"⚙️  Strategy Mode: {self.config.STRATEGY_MODE}")
+        print(f"⚙️  Strategy Mode: {getattr(self.config, 'STRATEGY_MODE', 'AUTO')}")
         
         # Display gap environment info if available
         if 'gap_stats' in market_condition:
@@ -350,7 +360,7 @@ def main():
     """Main entry point"""
     print("Initializing Trading System...")
     
-    # Create trading system
+    # Create trading system with default config (backward compatibility)
     trading_system = TradingSystem()
     
     # Run analysis

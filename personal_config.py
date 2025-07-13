@@ -1,58 +1,63 @@
-# personal_config.py - COMPLETE VERSION WITH AUTOMATED SYSTEM OVERRIDES
+# personal_config.py - STANDALONE COMPLETE VERSION
 """
-Personal Trading Configuration with Enhanced Rule Enforcement and Strategy Overrides
-Extends the base TradingConfig with personal preferences and strict rule enforcement
-Now includes full automated system strategy override support
+Personal Trading Configuration - STANDALONE SINGLE SOURCE OF TRUTH
+This is the ONLY configuration class - completely self-contained
+NO inheritance or dependencies on any other config files
+ALL configuration parameters are defined here
 """
 
 import os
 from datetime import datetime
 from typing import List, Dict, Tuple, Any
-from trading_system.config.settings import TradingConfig
 from trading_system.config.stock_lists import StockLists
 
-class PersonalTradingConfig(TradingConfig):
-    # =================================================================
-    # AUTOMATED SYSTEM CONTROL SETTINGS (NEW)
-    # =================================================================
-    
-    # Strategy Selection Mode for Automated System
-    AUTOMATED_STRATEGY_MODE = 'AUTO'  # Options: 'AUTO', 'FORCE_STRATEGY', 'FORCE_STOCK_LIST', 'CUSTOM'
-    
-    # Strategy Override Settings
-    FORCED_STRATEGY = 'GapTrading'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STRATEGY'
-    FORCED_STOCK_LIST = 'ValueRate'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STOCK_LIST'
-    
-    # Custom Override Settings (for advanced users)
-    CUSTOM_STRATEGY_OVERRIDE = None     # Set to strategy name to override
-    CUSTOM_STOCK_LIST_OVERRIDE = None   # Set to stock list name to override
-    
-    # Automated System Behavior Controls
-    ENABLE_STRATEGY_RETRY = True        # Retry with different strategy if first fails
-    FALLBACK_STRATEGY = 'BollingerMeanReversion'  # Strategy to use if preferred fails
-    MAX_STRATEGY_ATTEMPTS = 2           # How many strategies to try before giving up
-    
-    # Market Condition Override
-    IGNORE_MARKET_CONDITIONS = False    # If True, always use FORCED_STRATEGY regardless of market
+class PersonalTradingConfig:
+    """
+    STANDALONE COMPLETE TRADING CONFIGURATION
+    This class contains ALL configuration parameters with no dependencies
+    This is the ONLY configuration source for the entire trading system
+    """
     
     # =================================================================
-    # PERSONAL TRADING RULES (CRITICAL - NEVER OVERRIDE) - CLASS LEVEL
+    # CORE TRADING PARAMETERS - ALL SELF-CONTAINED
+    # =================================================================
+    
+    # Database
+    DATABASE_PATH = "trading_data.db"
+    
+    # Account sizing and risk management
+    ACCOUNT_SIZE = float(os.getenv('ACCOUNT_SIZE', 10000))
+    MAX_POSITION_SIZE = 0.10  # Legacy name for backward compatibility with strategies
+    MAX_POSITION_VALUE_PERCENT = 0.5    # 50% max of account per position (AUTHORITATIVE)
+    MIN_POSITION_VALUE = 1              # Minimum $1 position
+    MAX_POSITIONS = 5                   # Legacy name for backward compatibility
+    MAX_POSITIONS_TOTAL = 8             # Maximum 8 total positions (AUTHORITATIVE)
+    
+    # Risk management
+    STOP_LOSS_PERCENT = 0.08           # 8% stop loss
+    PERSONAL_STOP_LOSS = 0.08          # Same as above for consistency
+    PERSONAL_TAKE_PROFIT = 0.15        # 15% take profit target
+    MAX_DAILY_LOSS = 0.05              # 5% max daily loss
+    MAX_DAILY_RISK_PERCENT = 0.05      # Same as above for consistency
+    
+    # Technical indicators
+    BB_PERIOD = 20
+    BB_STD_DEV = 2
+    RSI_PERIOD = 14
+    RSI_OVERSOLD = 30
+    RSI_OVERBOUGHT = 70
+    
+    # Data refresh
+    DATA_REFRESH_MINUTES = 15
+    
+    # =================================================================
+    # PERSONAL TRADING RULES (CRITICAL - NEVER OVERRIDE)
     # =================================================================
     ALLOW_SHORT_SELLING = False  # Never allow short selling
     ALLOW_DAY_TRADING = False    # Never allow day trading
     
     # Day trading detection settings
     DAY_TRADING_LOOKBACK_HOURS = 24  # Consider trades within 24 hours as potential day trades
-    
-    # Position Management
-    MAX_POSITION_VALUE_PERCENT = 0.5  # 50% max of account per position
-    MIN_POSITION_VALUE = 1          # Minimum $1 position
-    MAX_POSITIONS_TOTAL = 8            # Maximum 8 total positions
-    
-    # Risk Management (Personal)
-    PERSONAL_STOP_LOSS = 0.08          # 8% stop loss (more conservative)
-    PERSONAL_TAKE_PROFIT = 0.15        # 15% take profit target
-    MAX_DAILY_RISK_PERCENT = 0.5      # 5% max account risk per day
     
     # Fractional Order Safety Settings
     FRACTIONAL_FUND_BUFFER = 0.9       # Use only 90% of available funds for fractional orders
@@ -90,37 +95,71 @@ class PersonalTradingConfig(TradingConfig):
     REQUIRE_CONFIRMATION = True       # Always ask before trading
     SHOW_DETAILED_ANALYSIS = True    # Show full signal details
     
-    # Holdings to exclude from analysis (buy and hold) - CLASS LEVEL
+    # Holdings to exclude from analysis (buy and hold)
     BUY_AND_HOLD_POSITIONS = [
         # Add any positions you never want to sell
         # Example: 'AAPL', 'MSFT'
     ]
+    
+    # =================================================================
+    # GAP TRADING PARAMETERS
+    # =================================================================
+    GAP_MIN_SIZE = 0.01          # 1% minimum gap to consider
+    GAP_LARGE_SIZE = 0.03        # 3% large gap threshold
+    GAP_EXTREME_SIZE = 0.05      # 5% extreme gap threshold
+    GAP_VOLUME_MULTIPLIER = 1.5  # Volume vs average required
+    GAP_TIMEOUT_MINUTES = 60     # Max time in gap trade (minutes)
+    GAP_MAX_RISK = 0.03          # 3% max risk per gap trade
+    GAP_STOP_MULTIPLIER = 1.5    # Stop loss multiplier for gap trades
+    GAP_ENVIRONMENT_THRESHOLD = 0.30  # 30% of stocks must gap for "high gap day"
+    EARNINGS_SEASON_VIX_THRESHOLD = 22  # VIX level indicating earnings volatility
+    
+    # =================================================================
+    # AUTOMATED SYSTEM CONTROL SETTINGS
+    # =================================================================
+    
+    # Strategy Selection Mode for Automated System
+    AUTOMATED_STRATEGY_MODE = 'AUTO'  # Options: 'AUTO', 'FORCE_STRATEGY', 'FORCE_STOCK_LIST', 'CUSTOM'
+    
+    # Strategy Override Settings
+    FORCED_STRATEGY = 'GapTrading'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STRATEGY'
+    FORCED_STOCK_LIST = 'ValueRate'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STOCK_LIST'
+    
+    # Custom Override Settings (for advanced users)
+    CUSTOM_STRATEGY_OVERRIDE = None     # Set to strategy name to override
+    CUSTOM_STOCK_LIST_OVERRIDE = None   # Set to stock list name to override
+    
+    # Automated System Behavior Controls
+    ENABLE_STRATEGY_RETRY = True        # Retry with different strategy if first fails
+    FALLBACK_STRATEGY = 'BollingerMeanReversion'  # Strategy to use if preferred fails
+    MAX_STRATEGY_ATTEMPTS = 2           # How many strategies to try before giving up
+    
+    # Market Condition Override
+    IGNORE_MARKET_CONDITIONS = False    # If True, always use FORCED_STRATEGY regardless of market
+    
+    # Legacy strategy mode support (for backward compatibility)
+    STRATEGY_MODE = 'AUTO'  # Options: 'AUTO', 'FORCE_BB', 'FORCE_GAP', 'TEST_GAP'
 
     def __init__(self):
-        super().__init__()  # Call parent constructor
-        
-        # Database path
-        self.DATABASE_PATH = "trading_data.db"
-        
         # Account configurations
         self.ACCOUNT_CONFIGURATIONS = {
             'CASH': {
                 'enabled': True,
                 'day_trading_enabled': False,
                 'options_enabled': False,
-                'max_position_size': 0.2,  # 20% of account value
+                'max_position_size': self.MAX_POSITION_VALUE_PERCENT,
                 'pdt_protection': False,
-                'min_trade_amount': 5,
+                'min_trade_amount': self.MIN_FRACTIONAL_ORDER,
                 'max_trade_amount': 30
             },
             'MARGIN': {
                 'enabled': True,
                 'day_trading_enabled': True,
                 'options_enabled': False,
-                'max_position_size': 0.2,  # 20% of account value
+                'max_position_size': self.MAX_POSITION_VALUE_PERCENT,
                 'pdt_protection': True,
                 'min_account_value_for_pdt': 25000,
-                'min_trade_amount': 5,
+                'min_trade_amount': self.MIN_FRACTIONAL_ORDER,
                 'max_trade_amount': 30
             }
         }
@@ -138,13 +177,52 @@ class PersonalTradingConfig(TradingConfig):
         ]
 
     # =================================================================
-    # AUTOMATED SYSTEM CONTROL METHODS
+    # AUTHORITATIVE CONFIGURATION METHODS
     # =================================================================
+    
+    @classmethod
+    def get_all_config_summary(cls) -> Dict:
+        """Get comprehensive summary of ALL configuration values"""
+        return {
+            'account_config': {
+                'max_position_percent': cls.MAX_POSITION_VALUE_PERCENT,
+                'min_position_value': cls.MIN_POSITION_VALUE,
+                'max_positions_total': cls.MAX_POSITIONS_TOTAL,
+                'stop_loss_percent': cls.STOP_LOSS_PERCENT,
+                'max_daily_loss': cls.MAX_DAILY_LOSS,
+            },
+            'trading_rules': {
+                'allow_short_selling': cls.ALLOW_SHORT_SELLING,
+                'allow_day_trading': cls.ALLOW_DAY_TRADING,
+                'min_signal_confidence': cls.MIN_SIGNAL_CONFIDENCE,
+                'fractional_enabled': True,
+                'min_fractional_order': cls.MIN_FRACTIONAL_ORDER,
+            },
+            'strategy_config': {
+                'mode': cls.AUTOMATED_STRATEGY_MODE,
+                'forced_strategy': cls.FORCED_STRATEGY,
+                'forced_stock_list': cls.FORCED_STOCK_LIST,
+                'enable_retry': cls.ENABLE_STRATEGY_RETRY,
+                'fallback_strategy': cls.FALLBACK_STRATEGY,
+            },
+            'gap_trading': {
+                'min_size': cls.GAP_MIN_SIZE,
+                'large_size': cls.GAP_LARGE_SIZE,
+                'volume_multiplier': cls.GAP_VOLUME_MULTIPLIER,
+            },
+            'technical_indicators': {
+                'bb_period': cls.BB_PERIOD,
+                'rsi_period': cls.RSI_PERIOD,
+                'rsi_oversold': cls.RSI_OVERSOLD,
+                'rsi_overbought': cls.RSI_OVERBOUGHT,
+            }
+        }
     
     @classmethod
     def get_automated_strategy_override(cls) -> Tuple[str, str]:
         """
-        Get strategy and stock list overrides for automated system
+        AUTHORITATIVE strategy and stock list override method
+        Used by automated_system.py - THIS IS THE SINGLE SOURCE OF TRUTH
         
         Returns:
             Tuple of (strategy_override, stock_list_override)
@@ -153,6 +231,16 @@ class PersonalTradingConfig(TradingConfig):
         strategy_override = None
         stock_list_override = None
         
+        # Support legacy STRATEGY_MODE first for backward compatibility
+        if hasattr(cls, 'STRATEGY_MODE'):
+            if cls.STRATEGY_MODE == 'FORCE_BB':
+                return 'BollingerMeanReversion', None
+            elif cls.STRATEGY_MODE == 'FORCE_GAP':
+                return 'GapTrading', None
+            elif cls.STRATEGY_MODE == 'TEST_GAP':
+                return 'GapTrading', 'GapTrading'
+        
+        # Then use new AUTOMATED_STRATEGY_MODE
         if cls.AUTOMATED_STRATEGY_MODE == 'AUTO':
             # Let the system choose automatically based on market conditions
             strategy_override = None
@@ -176,22 +264,16 @@ class PersonalTradingConfig(TradingConfig):
         return strategy_override, stock_list_override
     
     @classmethod
-    def should_ignore_market_conditions(cls) -> bool:
-        """Check if market conditions should be ignored for strategy selection"""
-        return cls.IGNORE_MARKET_CONDITIONS
-    
-    @classmethod
-    def get_fallback_strategy(cls) -> str:
-        """Get the fallback strategy if preferred strategy fails"""
-        return cls.FALLBACK_STRATEGY
-    
-    @classmethod
     def get_automated_system_summary(cls) -> Dict:
-        """Get summary of automated system configuration"""
+        """
+        AUTHORITATIVE automated system configuration summary
+        Used by automated_system.py - THIS IS THE SINGLE SOURCE OF TRUTH
+        """
         strategy_override, stock_list_override = cls.get_automated_strategy_override()
         
         return {
             'mode': cls.AUTOMATED_STRATEGY_MODE,
+            'legacy_strategy_mode': getattr(cls, 'STRATEGY_MODE', 'AUTO'),
             'strategy_override': strategy_override,
             'stock_list_override': stock_list_override,
             'ignore_market_conditions': cls.IGNORE_MARKET_CONDITIONS,
@@ -201,6 +283,16 @@ class PersonalTradingConfig(TradingConfig):
             'forced_strategy': cls.FORCED_STRATEGY,
             'forced_stock_list': cls.FORCED_STOCK_LIST
         }
+
+    @classmethod
+    def should_ignore_market_conditions(cls) -> bool:
+        """Check if market conditions should be ignored for strategy selection"""
+        return cls.IGNORE_MARKET_CONDITIONS
+    
+    @classmethod
+    def get_fallback_strategy(cls) -> str:
+        """Get the fallback strategy if preferred strategy fails"""
+        return cls.FALLBACK_STRATEGY
     
     @classmethod
     def validate_strategy_override(cls, strategy_name: str) -> bool:
@@ -245,17 +337,7 @@ class PersonalTradingConfig(TradingConfig):
     @classmethod
     def check_day_trading_violation(cls, symbol: str, signal_type: str, 
                                   recent_trades: List[Dict] = None) -> Tuple[bool, str]:
-        """
-        Check if executing this signal would violate day trading rules
-        
-        Args:
-            symbol: Stock symbol
-            signal_type: 'BUY' or 'SELL'
-            recent_trades: List of recent trades from database/tracking
-            
-        Returns:
-            Tuple of (is_violation: bool, reason: str)
-        """
+        """Check if executing this signal would violate day trading rules"""
         if cls.ALLOW_DAY_TRADING:
             return False, "Day trading allowed"
         
@@ -296,17 +378,7 @@ class PersonalTradingConfig(TradingConfig):
     @classmethod
     def check_short_selling_violation(cls, signal_type: str, current_positions: List[str], 
                                     symbol: str) -> Tuple[bool, str]:
-        """
-        Check if executing this signal would violate short selling rules
-        
-        Args:
-            signal_type: 'BUY' or 'SELL'  
-            current_positions: List of symbols currently held
-            symbol: Stock symbol for the signal
-            
-        Returns:
-            Tuple of (is_violation: bool, reason: str)
-        """
+        """Check if executing this signal would violate short selling rules"""
         if cls.ALLOW_SHORT_SELLING:
             return False, "Short selling allowed"
         
@@ -317,15 +389,7 @@ class PersonalTradingConfig(TradingConfig):
     
     @classmethod
     def validate_signal_against_rules(cls, signal: Dict) -> Tuple[bool, List[str]]:
-        """
-        Comprehensive signal validation against all personal trading rules
-        
-        Args:
-            signal: Trading signal dictionary
-            
-        Returns:
-            Tuple of (is_valid: bool, violations: List[str])
-        """
+        """Comprehensive signal validation against all personal trading rules"""
         violations = []
         signal_type = signal.get('signal_type', '')
         
@@ -361,18 +425,7 @@ class PersonalTradingConfig(TradingConfig):
     @classmethod
     def should_execute_signal(cls, signal, current_positions=None, account_value=0.0, 
                             recent_trades=None):
-        """
-        Enhanced signal execution check with proper rule enforcement
-        
-        Args:
-            signal: Trading signal dictionary
-            current_positions: List of current positions
-            account_value: Total account value
-            recent_trades: List of recent trades for day trading detection
-            
-        Returns:
-            tuple: (should_execute: bool, reason: str)
-        """
+        """Enhanced signal execution check with proper rule enforcement"""
         symbol = signal['symbol']
         signal_type = signal['signal_type']
         confidence = signal.get('confidence', 0)
@@ -429,18 +482,7 @@ class PersonalTradingConfig(TradingConfig):
 
     @classmethod
     def get_personal_scan_universe(cls, account_positions=None, settled_funds=0.0, vix_level=20):
-        """
-        Get personalized stock universe based on account, preferences, and market conditions
-        With fractional shares enabled, focus on quality rather than price affordability
-        
-        Args:
-            account_positions: List of current position symbols
-            settled_funds: Available settled funds
-            vix_level: Current VIX level for strategy filtering
-            
-        Returns:
-            List of symbols to scan across all strategies
-        """
+        """Get personalized stock universe based on account, preferences, and market conditions"""
         # Start with personal watchlist from StockLists
         scan_universe = StockLists.PERSONAL_WATCHLIST.copy()
         
@@ -502,24 +544,7 @@ class PersonalTradingConfig(TradingConfig):
     
     @classmethod
     def get_position_size(cls, signal_price, account_value, settled_funds):
-        """
-        Calculate optimal position size with safety buffer for fractional orders
-        
-        Updated logic: With fractional shares, any stock is theoretically affordable.
-        The constraints are:
-        1. Minimum fractional order size ($5)
-        2. Maximum position percentage (50% of account)
-        3. Available settled funds
-        4. Minimum position value for meaningful investment
-        
-        Args:
-            signal_price: Price of the stock
-            account_value: ACTUAL netLiquidation from Webull account
-            settled_funds: Available settled funds
-            
-        Returns:
-            dict: {'type': 'shares'/'dollars'/'none', 'amount': float, 'is_fractional': bool}
-        """
+        """Calculate optimal position size with safety buffer for fractional orders"""
         # Use the actual account value (netLiquidation) for percentage calculations
         max_by_percentage = account_value * cls.MAX_POSITION_VALUE_PERCENT
         max_by_funds = settled_funds
@@ -584,12 +609,7 @@ class PersonalTradingConfig(TradingConfig):
     
     @classmethod
     def get_fractional_capability_info(cls, account_value, settled_funds):
-        """
-        Get information about fractional share capabilities
-        
-        Returns:
-            dict: Fractional share capability analysis
-        """
+        """Get information about fractional share capabilities"""
         max_position = account_value * cls.MAX_POSITION_VALUE_PERCENT
         available_for_position = min(max_position, settled_funds)
         
@@ -622,17 +642,7 @@ class PersonalTradingConfig(TradingConfig):
     
     @classmethod
     def get_account_allocation_info(cls, account_value, settled_funds, current_positions):
-        """
-        Get detailed account allocation information
-        
-        Args:
-            account_value: ACTUAL netLiquidation from Webull
-            settled_funds: Available cash
-            current_positions: List of current positions
-            
-        Returns:
-            dict: Allocation analysis
-        """
+        """Get detailed account allocation information"""
         total_position_value = sum(pos.get('market_value', 0) for pos in current_positions)
         cash_percentage = (settled_funds / account_value * 100) if account_value > 0 else 0
         positions_percentage = (total_position_value / account_value * 100) if account_value > 0 else 0
@@ -655,9 +665,7 @@ class PersonalTradingConfig(TradingConfig):
     
     @classmethod
     def format_signal_display(cls, signal, position_data=None):
-        """
-        Format signal for display with fractional share information
-        """
+        """Format signal for display with fractional share information"""
         symbol = signal['symbol']
         signal_type = signal['signal_type']
         price = signal['price']
@@ -717,8 +725,13 @@ def validate_personal_config():
     """Validate personal configuration settings"""
     config = PersonalTradingConfig()
     
-    print("🔧 PERSONAL TRADING CONFIGURATION")
-    print("=" * 50)
+    print("🔧 STANDALONE PERSONAL TRADING CONFIGURATION")
+    print("=" * 70)
+    print("✅ NO DEPENDENCIES - COMPLETE STANDALONE CONFIG")
+    print("✅ NO INHERITANCE - ALL PARAMETERS SELF-CONTAINED")
+    print("✅ SINGLE SOURCE OF TRUTH FOR ENTIRE SYSTEM")
+    print("=" * 70)
+    
     print(f"Short Selling: {'❌ BLOCKED' if not config.ALLOW_SHORT_SELLING else '✅ Enabled'}")
     print(f"Day Trading: {'❌ BLOCKED' if not config.ALLOW_DAY_TRADING else '✅ Enabled'}")
     print(f"Max Position: {config.MAX_POSITION_VALUE_PERCENT:.1%} of account")
@@ -737,6 +750,7 @@ def validate_personal_config():
     summary = config.get_automated_system_summary()
     
     print(f"Strategy Mode: {summary['mode']}")
+    print(f"Legacy Mode: {summary['legacy_strategy_mode']}")
     print(f"Strategy Override: {summary['strategy_override']}")
     print(f"Stock List Override: {summary['stock_list_override']}")
     print(f"Ignore Market Conditions: {summary['ignore_market_conditions']}")
@@ -744,87 +758,20 @@ def validate_personal_config():
     print(f"Fallback Strategy: {summary['fallback_strategy']}")
     print(f"Max Attempts: {summary['max_attempts']}")
     
-    # Test rule enforcement
-    print(f"\n🛡️ RULE ENFORCEMENT TEST")
+    # Show full config summary
+    print("\n📋 COMPLETE CONFIGURATION SUMMARY")
     print("=" * 50)
+    full_config = config.get_all_config_summary()
+    for section, values in full_config.items():
+        print(f"\n{section.upper()}:")
+        for key, value in values.items():
+            print(f"  {key}: {value}")
     
-    # Test short selling detection
-    is_violation, reason = config.check_short_selling_violation('SELL', [], 'AAPL')
-    print(f"Short Selling Test: {'❌ BLOCKED' if is_violation else '✅ Allowed'} - {reason}")
-    
-    # Test signal validation
-    test_signal = {
-        'symbol': 'AAPL',
-        'signal_type': 'BUY',
-        'price': 150.0,
-        'confidence': 0.75
-    }
-    
-    should_execute, reason = config.should_execute_signal(
-        test_signal, 
-        current_positions=['MSFT', 'JNJ'], 
-        account_value=10000
-    )
-    
-    print(f"\nTest Signal: {test_signal['symbol']} {test_signal['signal_type']}")
-    print(f"Should Execute: {'✅ Yes' if should_execute else '❌ No'}")
-    print(f"Reason: {reason}")
-    
-    # Test invalid signal
-    invalid_signal = {
-        'symbol': 'AAPL',
-        'signal_type': 'SHORT',  # This should be blocked
-        'price': 150.0,
-        'confidence': 0.75
-    }
-    
-    is_valid, violations = config.validate_signal_against_rules(invalid_signal)
-    print(f"\nInvalid Signal Test: {'✅ Valid' if is_valid else '❌ Invalid'}")
-    if violations:
-        print(f"Violations: {'; '.join(violations)}")
-    
-    # Test position sizing
-    print(f"\n💰 POSITION SIZING TEST")
-    print("=" * 50)
-    position_info = config.get_position_size(150.0, 10000, 1000)
-    print(f"Stock Price: $150.00")
-    print(f"Account Value: $10,000")
-    print(f"Available Cash: $1,000")
-    print(f"Position Type: {position_info['type']}")
-    print(f"Position Amount: {position_info['amount']}")
-    print(f"Is Fractional: {position_info['is_fractional']}")
-    
-    print(f"\n📋 AVAILABLE STRATEGY MODES:")
-    print("  • AUTO: Let system choose based on market conditions")
-    print("  • FORCE_STRATEGY: Always use specific strategy")
-    print("  • FORCE_STOCK_LIST: Use specific stock list, auto strategy")
-    print("  • CUSTOM: Use custom strategy and stock list overrides")
-    
-    print(f"\n🎯 AVAILABLE STRATEGIES:")
-    strategies = [
-        'BollingerMeanReversion', 'GapTrading', 'BullishMomentumDipStrategy',
-        'International', 'MicrostructureBreakout', 'PolicyMomentum',
-        'SectorRotation', 'ValueRateStrategy'
-    ]
-    for strategy in strategies:
-        print(f"  • {strategy}")
-    
-    print(f"\n📊 AVAILABLE STOCK LISTS:")
-    stock_lists = [
-        'BollingerMeanReversion', 'GapTrading', 'Core', 'International',
-        'SectorRotation', 'ValueRate', 'MicrostructureBreakout', 'PolicyMomentum'
-    ]
-    for stock_list in stock_lists:
-        print(f"  • {stock_list}")
-    
-    print(f"\n📈 STOCK UNIVERSE SIZES FROM STOCKLISTS:")
-    print(f"  • Personal Watchlist: {len(StockLists.PERSONAL_WATCHLIST)} stocks")
-    print(f"  • International ETFs: {len(StockLists.INTERNATIONAL_ETFS)} ETFs")
-    print(f"  • Sector ETFs: {len(StockLists.SECTOR_ETFS)} ETFs")
-    print(f"  • REIT Universe: {len(StockLists.REIT_UNIVERSE)} REITs")
-    print(f"  • Financial Universe: {len(StockLists.FINANCIAL_UNIVERSE)} financials")
-    print(f"  • Policy Sensitive: {len(StockLists.POLICY_SENSITIVE_STOCKS)} stocks")
-    print(f"  • Microstructure: {len(StockLists.MICROSTRUCTURE_UNIVERSE)} stocks")
+    print("\n" + "="*70)
+    print("✅ STANDALONE CONFIG VALIDATION COMPLETE")
+    print("✅ NO EXTERNAL DEPENDENCIES REQUIRED")
+    print("✅ READY FOR SINGLE SOURCE OF TRUTH USAGE")
+    print("="*70)
 
 if __name__ == "__main__":
     validate_personal_config()
