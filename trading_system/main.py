@@ -1,7 +1,8 @@
-# trading_system/main.py - UPDATED to use PersonalTradingConfig as single source of truth
+# trading_system/main.py - UPDATED to use consolidated configuration (Legacy STRATEGY_MODE removed)
 import sys
 import os
 from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
 import pandas as pd
 import time
 
@@ -28,7 +29,7 @@ from strategies.value_rate_strategy import ValueRateStrategy
 from ai.market_analyzer import MarketConditionAnalyzer
 
 class TradingSystem:
-    """Main trading system orchestrator - UPDATED to use PersonalTradingConfig as single source of truth"""
+    """Main trading system orchestrator - UPDATED to use consolidated PersonalTradingConfig"""
     
     def __init__(self, config=None):
         # UPDATED: Use PersonalTradingConfig as default instead of TradingConfig
@@ -61,7 +62,8 @@ class TradingSystem:
         self.current_strategy = 'BollingerMeanReversion'
         self.stock_data_cache = {}  # Cache for gap environment analysis
         
-    def run_daily_analysis(self, strategy_override=None, stock_list_override=None):
+    def run_daily_analysis(self, strategy_override: Optional[str] = None, 
+                          stock_list_override: Optional[str] = None) -> Dict[str, Any]:
         """Run the complete daily trading analysis"""
         print(f"Starting daily analysis at {datetime.now()}")
         print(f"Using config: {type(self.config).__name__}")  # Debug: show which config is being used
@@ -125,22 +127,13 @@ class TradingSystem:
             'market_condition': market_condition
         }
     
-    def _fetch_and_store_data(self):
-        """Fetch and store stock data"""
+    def _fetch_and_store_data(self) -> None:
+        """Fetch and store stock data using consolidated configuration"""
         # Always fetch base stock list first
         base_stock_list = StockLists.BOLLINGER_MEAN_REVERSION
         
-        # Determine which stock universe to use based on strategy mode
-        # Check if config has STRATEGY_MODE (could be PersonalTradingConfig or base TradingConfig)
-        strategy_mode = getattr(self.config, 'STRATEGY_MODE', 'AUTO')
-        
-        if strategy_mode == 'FORCE_GAP':
-            stock_list = StockLists.GAP_TRADING_UNIVERSE
-        elif strategy_mode == 'AUTO':
-            # For AUTO mode, fetch full universe to enable gap detection
-            stock_list = StockLists.GAP_TRADING_UNIVERSE
-        else:
-            stock_list = base_stock_list
+        # UPDATED: Use consolidated configuration method instead of legacy STRATEGY_MODE
+        stock_list = self.config.get_stock_list_for_data_fetch()
         
         print(f"Fetching data for {len(stock_list)} stocks...")
         stock_data = self.data_fetcher.fetch_multiple_stocks(stock_list, "3mo")
@@ -162,8 +155,8 @@ class TradingSystem:
                 
                 print(f"✅ Updated data for {symbol}")
     
-    def _analyze_market_conditions(self):
-        """Analyze current market conditions with gap environment detection"""
+    def _analyze_market_conditions(self) -> Dict[str, Any]:
+        """Analyze current market conditions using consolidated configuration"""
         # Get SPY data for market analysis
         spy_data = self.db.get_stock_data('SPY', 100)
         
@@ -174,21 +167,23 @@ class TradingSystem:
         # Get actual VIX data (not VXX proxy)
         vix_data = self.db.get_stock_data('^VIX', 50)
         
-        # Enhanced market analysis with gap environment detection
-        strategy_mode = getattr(self.config, 'STRATEGY_MODE', 'AUTO')
+        # UPDATED: Use consolidated configuration method to determine if gap analysis needed
+        strategy_override = self.config.get_recommended_strategy_override()
         
-        if strategy_mode in ['AUTO', 'FORCE_GAP'] and self.stock_data_cache:
+        # Enhanced market analysis with gap environment detection
+        if strategy_override is None and self.stock_data_cache:
+            # AUTO mode with gap detection capability
             market_condition = self.market_analyzer.analyze_market_with_gaps(
                 spy_data, self.stock_data_cache, self.config, vix_data if not vix_data.empty else None)
         else:
+            # Strategy override or no gap cache
             market_condition = self.market_analyzer.analyze_market_condition(
                 spy_data, vix_data if not vix_data.empty else None)
         
-        # Override strategy based on STRATEGY_MODE
-        if strategy_mode == 'FORCE_BB':
-            market_condition['recommended_strategy'] = 'BollingerMeanReversion'
-        elif strategy_mode == 'FORCE_GAP':
-            market_condition['recommended_strategy'] = 'GapTrading'
+        # UPDATED: Apply strategy override from consolidated configuration
+        if strategy_override:
+            market_condition['recommended_strategy'] = strategy_override
+            print(f"✅ Strategy overridden by configuration: {strategy_override}")
         
         # Store market condition
         with self.db as conn:
@@ -207,7 +202,7 @@ class TradingSystem:
         
         return market_condition
     
-    def _select_strategy(self, market_condition: dict):
+    def _select_strategy(self, market_condition: Dict[str, Any]) -> None:
         """Select optimal strategy based on market conditions"""
         recommended_strategy = market_condition['recommended_strategy']
         
@@ -217,7 +212,7 @@ class TradingSystem:
         else:
             print(f"⚠ Strategy {recommended_strategy} not available, using {self.current_strategy}")
     
-    def _generate_signals(self, stock_list_override=None):
+    def _generate_signals(self, stock_list_override: Optional[str] = None) -> List[Dict[str, Any]]:
         """Generate trading signals using selected strategy"""
         strategy = self.strategies[self.current_strategy]
         all_signals = []
@@ -272,7 +267,7 @@ class TradingSystem:
         print(f"📊 Total signals found: {signals_found}")
         return all_signals
     
-    def _fetch_market_data(self, symbols):
+    def _fetch_market_data(self, symbols: List[str]) -> pd.DataFrame:
         """Fetch market data for specified symbols (used by enhanced_trading_example.py)"""
         stock_data = self.data_fetcher.fetch_multiple_stocks(symbols, "3mo")
         
@@ -294,10 +289,10 @@ class TradingSystem:
         else:
             return pd.DataFrame()
     
-    def _display_results(self, market_condition: dict, signals: list):
+    def _display_results(self, market_condition: Dict[str, Any], signals: List[Dict[str, Any]]) -> None:
         """Display analysis results"""
         print("\n" + "="*60)
-        print("ENHANCED TRADING SYSTEM ANALYSIS RESULTS")
+        print("CONSOLIDATED TRADING SYSTEM ANALYSIS RESULTS")
         print("="*60)
         
         print(f"\n📊 Market Condition: {market_condition['condition']}")
@@ -305,7 +300,14 @@ class TradingSystem:
         print(f"📉 VIX Level: {market_condition['vix_level']:.2f}")
         print(f"🎯 Recommended Strategy: {market_condition['recommended_strategy']}")
         print(f"🔍 Confidence: {market_condition['confidence']:.2f}")
-        print(f"⚙️  Strategy Mode: {getattr(self.config, 'STRATEGY_MODE', 'AUTO')}")
+        
+        # UPDATED: Display consolidated configuration mode
+        config_summary = self.config.get_automated_system_summary()
+        print(f"⚙️  Strategy Mode: {config_summary['mode']}")
+        if config_summary['strategy_override']:
+            print(f"🎯 Strategy Override: {config_summary['strategy_override']}")
+        if config_summary['stock_list_override']:
+            print(f"📊 Stock List Override: {config_summary['stock_list_override']}")
         
         # Display gap environment info if available
         if 'gap_stats' in market_condition:
@@ -356,9 +358,10 @@ class TradingSystem:
         print(f"\n📈 STOCK UNIVERSE: {len(StockLists.GAP_TRADING_UNIVERSE if self.current_strategy == 'GapTrading' else StockLists.BOLLINGER_MEAN_REVERSION)} stocks")
         print("="*60)
 
+
 def main():
     """Main entry point"""
-    print("Initializing Trading System...")
+    print("Initializing Consolidated Trading System...")
     
     # Create trading system with PersonalTradingConfig as default
     trading_system = TradingSystem()
@@ -370,6 +373,7 @@ def main():
     except Exception as e:
         print(f"Error during analysis: {e}")
         return []
+
 
 if __name__ == "__main__":
     main()

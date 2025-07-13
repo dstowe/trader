@@ -1,6 +1,6 @@
-# personal_config.py - STANDALONE COMPLETE VERSION
+# personal_config.py - COMPLETE VERSION WITH ALL METHODS
 """
-Personal Trading Configuration - STANDALONE SINGLE SOURCE OF TRUTH
+Personal Trading Configuration - SINGLE SOURCE OF TRUTH
 This is the ONLY configuration class - completely self-contained
 NO inheritance or dependencies on any other config files
 ALL configuration parameters are defined here
@@ -27,10 +27,8 @@ class PersonalTradingConfig:
     
     # Account sizing and risk management
     ACCOUNT_SIZE = float(os.getenv('ACCOUNT_SIZE', 10000))
-    # MAX_POSITION_SIZE = 0.10  # Legacy name for backward compatibility with strategies
     MAX_POSITION_VALUE_PERCENT = 0.5    # 50% max of account per position (AUTHORITATIVE)
     MIN_POSITION_VALUE = 1              # Minimum $1 position
-    # MAX_POSITIONS = 5                   # Legacy name for backward compatibility
     MAX_POSITIONS_TOTAL = 8             # Maximum 8 total positions (AUTHORITATIVE)
     
     # Risk management
@@ -115,10 +113,10 @@ class PersonalTradingConfig:
     EARNINGS_SEASON_VIX_THRESHOLD = 22  # VIX level indicating earnings volatility
     
     # =================================================================
-    # AUTOMATED SYSTEM CONTROL SETTINGS
+    # AUTOMATED SYSTEM CONTROL SETTINGS (CONSOLIDATED)
     # =================================================================
     
-    # Strategy Selection Mode for Automated System
+    # Strategy Selection Mode for Automated System (ONLY CONFIGURATION SYSTEM)
     AUTOMATED_STRATEGY_MODE = 'AUTO'  # Options: 'AUTO', 'FORCE_STRATEGY', 'FORCE_STOCK_LIST', 'CUSTOM'
     
     # Strategy Override Settings
@@ -136,9 +134,6 @@ class PersonalTradingConfig:
     
     # Market Condition Override
     IGNORE_MARKET_CONDITIONS = False    # If True, always use FORCED_STRATEGY regardless of market
-    
-    # Legacy strategy mode support (for backward compatibility)
-    STRATEGY_MODE = 'AUTO'  # Options: 'AUTO', 'FORCE_BB', 'FORCE_GAP', 'TEST_GAP'
 
     def __init__(self):
         # Account configurations
@@ -175,6 +170,108 @@ class PersonalTradingConfig:
             'PolicyMomentum',             # Seventh - Fed/policy volatility plays
             'MicrostructureBreakout'      # Eighth - precise breakout patterns
         ]
+
+    # =================================================================
+    # CONSOLIDATED CONFIGURATION METHODS (Legacy Support Removed)
+    # =================================================================
+    
+    @classmethod
+    def get_automated_strategy_override(cls) -> Tuple[str, str]:
+        """
+        CONSOLIDATED strategy and stock list override method
+        Legacy STRATEGY_MODE support has been removed
+        
+        Returns:
+            Tuple of (strategy_override, stock_list_override)
+            Both can be None if AUTO mode is selected
+        """
+        strategy_override = None
+        stock_list_override = None
+        
+        # Use AUTOMATED_STRATEGY_MODE (single source of truth)
+        if cls.AUTOMATED_STRATEGY_MODE == 'AUTO':
+            # Let the system choose automatically based on market conditions
+            strategy_override = None
+            stock_list_override = None
+            
+        elif cls.AUTOMATED_STRATEGY_MODE == 'FORCE_STRATEGY':
+            # Force a specific strategy
+            strategy_override = cls.FORCED_STRATEGY
+            stock_list_override = None
+            
+        elif cls.AUTOMATED_STRATEGY_MODE == 'FORCE_STOCK_LIST':
+            # Force a specific stock list (let strategy be auto-selected)
+            strategy_override = None
+            stock_list_override = cls.FORCED_STOCK_LIST
+            
+        elif cls.AUTOMATED_STRATEGY_MODE == 'CUSTOM':
+            # Use custom overrides (for advanced users)
+            strategy_override = cls.CUSTOM_STRATEGY_OVERRIDE
+            stock_list_override = cls.CUSTOM_STOCK_LIST_OVERRIDE
+            
+        return strategy_override, stock_list_override
+    
+    @classmethod
+    def get_automated_system_summary(cls) -> Dict:
+        """
+        CONSOLIDATED automated system configuration summary
+        Legacy STRATEGY_MODE references removed
+        """
+        strategy_override, stock_list_override = cls.get_automated_strategy_override()
+        
+        return {
+            'mode': cls.AUTOMATED_STRATEGY_MODE,
+            'strategy_override': strategy_override,
+            'stock_list_override': stock_list_override,
+            'ignore_market_conditions': cls.IGNORE_MARKET_CONDITIONS,
+            'enable_retry': cls.ENABLE_STRATEGY_RETRY,
+            'fallback_strategy': cls.FALLBACK_STRATEGY,
+            'max_attempts': cls.MAX_STRATEGY_ATTEMPTS,
+            'forced_strategy': cls.FORCED_STRATEGY,
+            'forced_stock_list': cls.FORCED_STOCK_LIST
+        }
+
+    # =================================================================
+    # MISSING HELPER METHODS FOR MAIN.PY INTEGRATION
+    # =================================================================
+    
+    @classmethod
+    def get_stock_list_for_data_fetch(cls) -> List[str]:
+        """
+        Get the appropriate stock list for data fetching based on strategy mode
+        Replaces legacy STRATEGY_MODE logic in main.py
+        """
+        strategy_override, stock_list_override = cls.get_automated_strategy_override()
+        
+        # If we have a stock list override, determine the appropriate universe
+        if stock_list_override:
+            if stock_list_override == 'GapTrading':
+                return StockLists.GAP_TRADING_UNIVERSE
+            elif stock_list_override == 'BollingerMeanReversion':
+                return StockLists.BOLLINGER_MEAN_REVERSION
+            else:
+                return StockLists.GAP_TRADING_UNIVERSE  # Default fallback
+        
+        # If we have a strategy override, get appropriate universe
+        if strategy_override:
+            if strategy_override == 'GapTrading':
+                return StockLists.GAP_TRADING_UNIVERSE
+            elif strategy_override == 'BollingerMeanReversion':
+                return StockLists.BOLLINGER_MEAN_REVERSION
+            else:
+                return StockLists.BOLLINGER_MEAN_REVERSION  # Default fallback
+        
+        # For AUTO mode, fetch full universe to enable gap detection
+        return StockLists.GAP_TRADING_UNIVERSE
+    
+    @classmethod
+    def get_recommended_strategy_override(cls) -> str:
+        """
+        Get strategy override for market condition analysis
+        Replaces legacy STRATEGY_MODE logic in main.py
+        """
+        strategy_override, _ = cls.get_automated_strategy_override()
+        return strategy_override
 
     # =================================================================
     # AUTHORITATIVE CONFIGURATION METHODS
@@ -218,72 +315,6 @@ class PersonalTradingConfig:
             }
         }
     
-    @classmethod
-    def get_automated_strategy_override(cls) -> Tuple[str, str]:
-        """
-        AUTHORITATIVE strategy and stock list override method
-        Used by automated_system.py - THIS IS THE SINGLE SOURCE OF TRUTH
-        
-        Returns:
-            Tuple of (strategy_override, stock_list_override)
-            Both can be None if AUTO mode is selected
-        """
-        strategy_override = None
-        stock_list_override = None
-        
-        # Support legacy STRATEGY_MODE first for backward compatibility
-        if hasattr(cls, 'STRATEGY_MODE'):
-            if cls.STRATEGY_MODE == 'FORCE_BB':
-                return 'BollingerMeanReversion', None
-            elif cls.STRATEGY_MODE == 'FORCE_GAP':
-                return 'GapTrading', None
-            elif cls.STRATEGY_MODE == 'TEST_GAP':
-                return 'GapTrading', 'GapTrading'
-        
-        # Then use new AUTOMATED_STRATEGY_MODE
-        if cls.AUTOMATED_STRATEGY_MODE == 'AUTO':
-            # Let the system choose automatically based on market conditions
-            strategy_override = None
-            stock_list_override = None
-            
-        elif cls.AUTOMATED_STRATEGY_MODE == 'FORCE_STRATEGY':
-            # Force a specific strategy
-            strategy_override = cls.FORCED_STRATEGY
-            stock_list_override = None
-            
-        elif cls.AUTOMATED_STRATEGY_MODE == 'FORCE_STOCK_LIST':
-            # Force a specific stock list (let strategy be auto-selected)
-            strategy_override = None
-            stock_list_override = cls.FORCED_STOCK_LIST
-            
-        elif cls.AUTOMATED_STRATEGY_MODE == 'CUSTOM':
-            # Use custom overrides (for advanced users)
-            strategy_override = cls.CUSTOM_STRATEGY_OVERRIDE
-            stock_list_override = cls.CUSTOM_STOCK_LIST_OVERRIDE
-            
-        return strategy_override, stock_list_override
-    
-    @classmethod
-    def get_automated_system_summary(cls) -> Dict:
-        """
-        AUTHORITATIVE automated system configuration summary
-        Used by automated_system.py - THIS IS THE SINGLE SOURCE OF TRUTH
-        """
-        strategy_override, stock_list_override = cls.get_automated_strategy_override()
-        
-        return {
-            'mode': cls.AUTOMATED_STRATEGY_MODE,
-            'legacy_strategy_mode': getattr(cls, 'STRATEGY_MODE', 'AUTO'),
-            'strategy_override': strategy_override,
-            'stock_list_override': stock_list_override,
-            'ignore_market_conditions': cls.IGNORE_MARKET_CONDITIONS,
-            'enable_retry': cls.ENABLE_STRATEGY_RETRY,
-            'fallback_strategy': cls.FALLBACK_STRATEGY,
-            'max_attempts': cls.MAX_STRATEGY_ATTEMPTS,
-            'forced_strategy': cls.FORCED_STRATEGY,
-            'forced_stock_list': cls.FORCED_STOCK_LIST
-        }
-
     @classmethod
     def should_ignore_market_conditions(cls) -> bool:
         """Check if market conditions should be ignored for strategy selection"""
@@ -831,11 +862,12 @@ def validate_personal_config():
     """Validate personal configuration settings"""
     config = PersonalTradingConfig()
     
-    print("🔧 STANDALONE PERSONAL TRADING CONFIGURATION")
+    print("🔧 COMPLETE PERSONAL TRADING CONFIGURATION")
     print("=" * 70)
     print("✅ NO DEPENDENCIES - COMPLETE STANDALONE CONFIG")
     print("✅ NO INHERITANCE - ALL PARAMETERS SELF-CONTAINED")
     print("✅ SINGLE SOURCE OF TRUTH FOR ENTIRE SYSTEM")
+    print("✅ ALL MISSING METHODS INCLUDED")
     print("=" * 70)
     
     print(f"Short Selling: {'❌ BLOCKED' if not config.ALLOW_SHORT_SELLING else '✅ Enabled'}")
@@ -849,20 +881,35 @@ def validate_personal_config():
     print(f"Trading Hours: {config.TRADING_START_TIME} - {config.TRADING_END_TIME}")
     print(f"Watchlist: {len(StockLists.PERSONAL_WATCHLIST)} stocks")
     
-    print("\n🤖 AUTOMATED SYSTEM CONFIGURATION")
+    print("\n🤖 CONSOLIDATED AUTOMATED SYSTEM CONFIGURATION")
     print("=" * 50)
     
     # Get current automated system settings
     summary = config.get_automated_system_summary()
     
     print(f"Strategy Mode: {summary['mode']}")
-    print(f"Legacy Mode: {summary['legacy_strategy_mode']}")
     print(f"Strategy Override: {summary['strategy_override']}")
     print(f"Stock List Override: {summary['stock_list_override']}")
     print(f"Ignore Market Conditions: {summary['ignore_market_conditions']}")
     print(f"Enable Retry: {summary['enable_retry']}")
     print(f"Fallback Strategy: {summary['fallback_strategy']}")
     print(f"Max Attempts: {summary['max_attempts']}")
+    
+    # Test missing methods
+    print("\n🔧 TESTING MISSING METHODS")
+    print("=" * 40)
+    
+    try:
+        stock_list = config.get_stock_list_for_data_fetch()
+        print(f"✅ get_stock_list_for_data_fetch(): {len(stock_list)} stocks")
+    except Exception as e:
+        print(f"❌ get_stock_list_for_data_fetch(): {e}")
+    
+    try:
+        strategy_override = config.get_recommended_strategy_override()
+        print(f"✅ get_recommended_strategy_override(): {strategy_override}")
+    except Exception as e:
+        print(f"❌ get_recommended_strategy_override(): {e}")
     
     # Show full config summary
     print("\n📋 COMPLETE CONFIGURATION SUMMARY")
@@ -874,10 +921,11 @@ def validate_personal_config():
             print(f"  {key}: {value}")
     
     print("\n" + "="*70)
-    print("✅ STANDALONE CONFIG VALIDATION COMPLETE")
-    print("✅ NO EXTERNAL DEPENDENCIES REQUIRED")
-    print("✅ READY FOR SINGLE SOURCE OF TRUTH USAGE")
+    print("✅ COMPLETE CONFIG VALIDATION SUCCESSFUL")
+    print("✅ ALL MISSING METHODS IMPLEMENTED")
+    print("✅ READY FOR MAIN.PY INTEGRATION")
     print("="*70)
+
 
 if __name__ == "__main__":
     validate_personal_config()
