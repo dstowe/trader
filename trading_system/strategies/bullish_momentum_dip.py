@@ -90,8 +90,8 @@ class BullishMomentumDipStrategy:
                 'signal_type': 'BUY',
                 'price': float(latest['Close']),
                 'confidence': float(confidence),
+                'reason': 'bullish_momentum_dip_opportunity',
                 'metadata': json.dumps({
-                    'reason': 'bullish_momentum_dip_opportunity',
                     'momentum_20d': momentum_20d,
                     'momentum_50d': momentum_50d,
                     'pullback_from_high': pullback,
@@ -120,8 +120,8 @@ class BullishMomentumDipStrategy:
                 'signal_type': 'SELL',
                 'price': float(latest['Close']),
                 'confidence': float(confidence),
+                'reason': 'momentum_exhaustion_or_trend_break',
                 'metadata': json.dumps({
-                    'reason': 'momentum_exhaustion_or_trend_break',
                     'momentum_exhausted': momentum_exhausted,
                     'trend_broken': trend_broken,
                     'market_bearish': market_bearish

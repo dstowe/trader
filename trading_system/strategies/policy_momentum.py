@@ -65,20 +65,24 @@ class PolicyMomentumStrategy:
         buy_signal = self._check_buy_signal(latest, data, symbol, estimated_vix)
         if buy_signal:
             confidence = self._calculate_confidence(latest, data, 'BUY', symbol, estimated_vix)
+            
+            # Convert all values to JSON-serializable types
+            policy_momentum = float(self._calculate_policy_momentum(data))
+            stop_loss_price = float(latest['Close'] * (1 - self.config.PERSONAL_STOP_LOSS))
+            
             signals.append({
                 'symbol': symbol,
                 'date': latest_date,
                 'strategy': self.name,
                 'signal_type': 'BUY',
-                'price': latest['Close'],
-                'confidence': confidence,
-                'reason': 'policy_momentum_buy',
+                'price': float(latest['Close']),
+                'confidence': float(confidence),
                 'metadata': json.dumps({
-                    'estimated_vix': estimated_vix,
-                    'policy_momentum': self._calculate_policy_momentum(data),
-                    'volatility_regime': self._get_volatility_regime(estimated_vix),
-                    'sector': self._get_policy_sector(symbol),
-                    'stop_loss': latest['Close'] * (1 - self.config.PERSONAL_STOP_LOSS),
+                    'estimated_vix': float(estimated_vix),
+                    'policy_momentum': policy_momentum,
+                    'volatility_regime': str(self._get_volatility_regime(estimated_vix)),
+                    'sector': str(self._get_policy_sector(symbol)),
+                    'stop_loss': stop_loss_price,
                     'strategy_logic': 'policy_momentum_entry'
                 })
             })
@@ -87,18 +91,22 @@ class PolicyMomentumStrategy:
         sell_signal = self._check_sell_signal(latest, data, symbol, estimated_vix)
         if sell_signal:
             confidence = self._calculate_confidence(latest, data, 'SELL', symbol, estimated_vix)
+            
+            # Convert all values to JSON-serializable types
+            vix_spike = bool(estimated_vix > self.VIX_EXTREME_THRESHOLD)
+            policy_reversal = True
+            
             signals.append({
                 'symbol': symbol,
                 'date': latest_date,
                 'strategy': self.name,
                 'signal_type': 'SELL',
-                'price': latest['Close'],
-                'confidence': confidence,
-                'reason': 'policy_reversal_or_vix_spike',
+                'price': float(latest['Close']),
+                'confidence': float(confidence),
                 'metadata': json.dumps({
-                    'estimated_vix': estimated_vix,
-                    'vix_spike': estimated_vix > self.VIX_EXTREME_THRESHOLD,
-                    'policy_reversal': True
+                    'estimated_vix': float(estimated_vix),
+                    'vix_spike': vix_spike,
+                    'policy_reversal': policy_reversal
                 })
             })
         

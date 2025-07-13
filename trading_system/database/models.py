@@ -172,9 +172,12 @@ class DatabaseManager:
             return df
     
     def insert_signal(self, symbol: str, date: str, strategy: str, 
-                     signal_type: str, price: float, confidence: float, 
-                     metadata: str = None):
-        """Insert trading signal"""
+                    signal_type: str, price: float, confidence: float, 
+                    metadata: str = None, **kwargs):
+        """
+        Insert trading signal
+        **kwargs allows for extra fields like 'reason' that aren't stored in DB
+        """
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
                 INSERT INTO signals 
