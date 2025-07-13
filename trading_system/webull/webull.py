@@ -56,7 +56,7 @@ class webull :
         #miscellaenous
         self._did = self._get_did()
         self._region_code = region_code or 6
-        self.zone_var = 'dc_core_r001'
+        self.zone_var = 'dc_core_r1'
         self.timeout = 15
 
     def _get_did(self, path=''):
@@ -321,6 +321,7 @@ class webull :
 
         response = requests.get(self._urls.account_id(), headers=headers, timeout=self.timeout)
         result = response.json()
+        #print(result)
         if result['success'] and len(result['data']) > 0 :
             self.zone_var = str(result['data'][int(id)]['rzone'])
             self._account_id = str(result['data'][int(id)]['secAccountId'])

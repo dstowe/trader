@@ -49,10 +49,13 @@ class SessionManager:
                 session_data = json.load(f)
             
             self.session_data = session_data
+            self.logger.debug(f"Loaded session data with keys: {list(session_data.keys())}")
             
             # Check if session is still valid
             if not self._is_session_valid(session_data):
                 self.logger.info("Session expired or invalid")
+                self.logger.info("Clearing invalid session file")
+                self.clear_session()
                 return False
             
             # Apply session data to webull instance
@@ -62,22 +65,34 @@ class SessionManager:
             wb._uuid = session_data.get('uuid', '')
             wb._account_id = session_data.get('account_id', '')
             wb._trade_token = session_data.get('trade_token', '')
-            wb.zone_var = session_data.get('zone_var', 'dc_core_r001')
+            wb.zone_var = session_data.get('zone_var', 'dc_core_r1')
             
             self.logger.info("Session loaded successfully")
+            self.logger.debug(f"Set zone_var to: {wb.zone_var}")
+            self.logger.debug(f"Set account_id to: {wb._account_id}")
             
             # IMPORTANT: Re-initialize account context to ensure proper API access
             # This is crucial for account discovery to work correctly
             try:
+                self.logger.debug("Attempting to re-initialize account context...")
                 account_id = wb.get_account_id()
                 if account_id:
                     self.logger.info(f"Account context re-initialized: {account_id}")
                     return True
                 else:
-                    self.logger.warning("Failed to re-initialize account context")
+                    self.logger.warning("Failed to re-initialize account context - session may be expired")
+                    self.logger.info("Clearing invalid session file")
+                    self.clear_session()
                     return False
+            except KeyError as e:
+                self.logger.warning(f"API response missing expected field {e} - session likely expired")
+                self.logger.info("Clearing invalid session file")
+                self.clear_session()
+                return False
             except Exception as e:
-                self.logger.warning(f"Failed to re-initialize account context: {e}")
+                self.logger.warning(f"Failed to re-initialize account context: {e} - session may be invalid")
+                self.logger.info("Clearing invalid session file")
+                self.clear_session()
                 return False
             
         except Exception as e:
@@ -111,22 +126,28 @@ class SessionManager:
                     self.logger.debug(f"Could not parse token expiration: {e}")
                     return False
             
-            # Check session age
+            # Check session age - be more conservative
             saved_at = session_data.get('saved_at', '')
             if saved_at:
                 try:
                     saved_time = datetime.fromisoformat(saved_at)
                     age = datetime.now() - saved_time
                     
-                    # Sessions older than 24 hours are considered stale
-                    if age > timedelta(hours=24):
-                        self.logger.debug("Session is too old")
+                    # Sessions older than 12 hours are considered stale (reduced from 24)
+                    if age > timedelta(hours=12):
+                        self.logger.debug(f"Session is too old: {age.total_seconds()/3600:.1f} hours")
                         return False
                         
                 except ValueError as e:
                     self.logger.debug(f"Could not parse saved time: {e}")
                     return False
             
+            # Additional basic validation
+            access_token = session_data.get('access_token', '')
+            if not access_token or len(access_token) < 10:
+                self.logger.debug("Access token appears invalid")
+                return False
+                
             return True
             
         except Exception as e:
@@ -148,25 +169,33 @@ class SessionManager:
             return False
     
     def refresh_session(self, wb) -> bool:
-        """Refresh the session using refresh token"""
+        """Refresh the session using refresh token - DISABLED DUE TO ERRORS"""
         try:
-            self.logger.info("Attempting to refresh session...")
+            self.logger.info("Session refresh requested but disabled due to errors")
+            self.logger.info("Will attempt fresh login instead")
             
-            # Try to refresh login
-            result = wb.refresh_login()
+            # Instead of refreshing, we'll just return False so the system
+            # falls back to fresh login
+            return False
             
-            if 'accessToken' in result and result['accessToken']:
-                self.logger.info("✅ Session refreshed successfully")
-                
-                # Save the refreshed session
-                self.save_session(wb)
-                return True
-            else:
-                self.logger.warning("❌ Failed to refresh session")
-                return False
+            # ORIGINAL CODE COMMENTED OUT:
+            # self.logger.info("Attempting to refresh session...")
+            # 
+            # # Try to refresh login
+            # result = wb.refresh_login()
+            # 
+            # if 'accessToken' in result and result['accessToken']:
+            #     self.logger.info("✅ Session refreshed successfully")
+            #     
+            #     # Save the refreshed session
+            #     self.save_session(wb)
+            #     return True
+            # else:
+            #     self.logger.warning("❌ Failed to refresh session")
+            #     return False
                 
         except Exception as e:
-            self.logger.error(f"❌ Error refreshing session: {e}")
+            self.logger.error(f"❌ Error in refresh session: {e}")
             return False
     
     def get_session_info(self) -> Dict:
@@ -202,25 +231,31 @@ class SessionManager:
         return info
     
     def auto_manage_session(self, wb, force_refresh=False) -> bool:
-        """Automatically manage session - load if valid, refresh if needed"""
+        """Automatically manage session - load if valid, skip refresh due to errors"""
         try:
             # Try to load existing session first
             if not force_refresh and self.load_session(wb):
                 self.logger.info("Loaded existing valid session")
                 return True
             
-            # If no valid session, try to refresh if we have a refresh token
-            if self.session_data and self.session_data.get('refresh_token'):
-                self.logger.info("Attempting to refresh session...")
-                if self.refresh_session(wb):
-                    self.logger.info("Refreshed expired session")
-                    return True
-                else:
-                    self.logger.warning("Session refresh failed")
-            
-            # If refresh fails or no refresh token, need new login
+            # Skip refresh functionality due to errors
+            self.logger.info("Session refresh disabled - will require fresh login")
             self.logger.info("No valid session found - new login required")
             return False
+            
+            # ORIGINAL REFRESH CODE COMMENTED OUT:
+            # # If no valid session, try to refresh if we have a refresh token
+            # if self.session_data and self.session_data.get('refresh_token'):
+            #     self.logger.info("Attempting to refresh session...")
+            #     if self.refresh_session(wb):
+            #         self.logger.info("Refreshed expired session")
+            #         return True
+            #     else:
+            #         self.logger.warning("Session refresh failed")
+            # 
+            # # If refresh fails or no refresh token, need new login
+            # self.logger.info("No valid session found - new login required")
+            # return False
             
         except Exception as e:
             self.logger.error(f"Error in auto session management: {e}")

@@ -64,9 +64,9 @@ class EnhancedAutomatedTradingSystem:
         self.trade_log_file = "enhanced_automated_trades.json"
         self.load_todays_trades()
         
-        # Load rule enforcement summary
+        # Load rule enforcement summary (reduced to DEBUG level)
         self.rule_summary = self.config.get_rule_enforcement_summary()
-        self.logger.info(f"🛡️ Rule Enforcement Active: {self.rule_summary}")
+        self.logger.debug(f"🛡️ Rule Enforcement Active: {self.rule_summary}")
         
     def load_todays_trades(self):
         """Load today's trades for day trading detection across all accounts"""
@@ -293,7 +293,7 @@ class EnhancedAutomatedTradingSystem:
         
         # Check per-account trade limit using PersonalTradingConfig
         if len(account_trades) >= self.config.MAX_POSITIONS_TOTAL:
-            self.logger.info(f"🚫 {account.account_type}: Daily trade limit reached ({len(account_trades)}/{self.config.MAX_POSITIONS_TOTAL})")
+            self.logger.debug(f"🚫 {account.account_type}: Daily trade limit reached ({len(account_trades)}/{self.config.MAX_POSITIONS_TOTAL})")
             return []
         
         for signal in signals:
@@ -309,12 +309,12 @@ class EnhancedAutomatedTradingSystem:
             )
             
             if not should_execute:
-                self.logger.info(f"⚠️ {account.account_type}: Filtered {symbol} - {reason}")
+                self.logger.debug(f"⚠️ {account.account_type}: Filtered {symbol} - {reason}")
                 continue
             
             # Check buy-and-hold protection from PersonalTradingConfig
             if symbol in self.config.BUY_AND_HOLD_POSITIONS and signal_type == 'SELL':
-                self.logger.info(f"🚨 {account.account_type}: BUY-AND-HOLD PROTECTION for {symbol}")
+                self.logger.debug(f"🚨 {account.account_type}: BUY-AND-HOLD PROTECTION for {symbol}")
                 continue
             
             # Position sizing for BUY signals using PersonalTradingConfig method
@@ -326,7 +326,7 @@ class EnhancedAutomatedTradingSystem:
                 )
                 
                 if position_info['type'] == 'none':
-                    self.logger.info(f"⚠️ {account.account_type}: Insufficient funds for {symbol}")
+                    self.logger.debug(f"⚠️ {account.account_type}: Insufficient funds for {symbol}")
                     continue
                 
                 signal['calculated_position_info'] = position_info
@@ -729,19 +729,19 @@ class EnhancedAutomatedTradingSystem:
             buy_and_hold_protected = 0
             
             for i, signal in enumerate(all_signals, 1):
-                self.logger.info(f"\n📊 Signal {i}/{len(all_signals)}: {signal['signal_type']} {signal['symbol']} @ ${signal['price']:.2f}")
-                self.logger.info(f"   Confidence: {signal.get('confidence', 0):.1%}")
+                self.logger.debug(f"\n📊 Signal {i}/{len(all_signals)}: {signal['signal_type']} {signal['symbol']} @ ${signal['price']:.2f}")
+                self.logger.debug(f"   Confidence: {signal.get('confidence', 0):.1%}")
                 
                 # Check minimum confidence using PersonalTradingConfig
                 if signal.get('confidence', 0) < self.config.MIN_SIGNAL_CONFIDENCE:
-                    self.logger.info(f"   ❌ Below minimum confidence threshold ({self.config.MIN_SIGNAL_CONFIDENCE:.1%})")
+                    self.logger.debug(f"   ❌ Below minimum confidence threshold ({self.config.MIN_SIGNAL_CONFIDENCE:.1%})")
                     confidence_filtered += 1
                     continue
                 
                 # Check buy-and-hold protection
                 if (signal['symbol'] in self.config.BUY_AND_HOLD_POSITIONS and 
                     signal['signal_type'] == 'SELL'):
-                    self.logger.info(f"   🛡️ BUY-AND-HOLD PROTECTION: {signal['symbol']}")
+                    self.logger.debug(f"   🛡️ BUY-AND-HOLD PROTECTION: {signal['symbol']}")
                     buy_and_hold_protected += 1
                     continue
                 
@@ -755,7 +755,7 @@ class EnhancedAutomatedTradingSystem:
                         total_rule_violations += 1
                 
                 if not suitable_accounts:
-                    self.logger.warning("🚨 No accounts can execute this signal due to enhanced rule violations")
+                    self.logger.debug("🚨 No accounts can execute this signal due to enhanced rule violations")
                     continue
                 
                 # Automatically select best account using PersonalTradingConfig logic
@@ -827,9 +827,9 @@ class EnhancedAutomatedTradingSystem:
             self.logger.error("📋 Full error details:", exc_info=True)
             return False
         
-        finally:
-            # Always try to logout for security
-            self.login_manager.logout()
+        # finally:
+        #     # Always try to logout for security
+        #     self.login_manager.logout()
 
 def setup_credentials():
     """One-time setup to encrypt and store credentials using new modular system"""

@@ -243,22 +243,28 @@ class LoginManager:
             return False
     
     def refresh_login(self) -> bool:
-        """Refresh the login session if possible"""
+        """Refresh the login session if possible - DISABLED DUE TO ERRORS"""
         try:
-            self.logger.info("Attempting to refresh login session...")
-            result = self.wb.refresh_login()
+            self.logger.info("Login refresh requested but disabled due to errors")
+            self.logger.info("Refresh functionality has been disabled - will require fresh login")
+            self.is_logged_in = False
+            return False
             
-            if 'accessToken' in result and result['accessToken']:
-                self.logger.info("✅ Login session refreshed successfully")
-                self.is_logged_in = True
-                return True
-            else:
-                self.logger.warning("❌ Failed to refresh login session")
-                self.is_logged_in = False
-                return False
+            # ORIGINAL CODE COMMENTED OUT:
+            # self.logger.info("Attempting to refresh login session...")
+            # result = self.wb.refresh_login()
+            # 
+            # if 'accessToken' in result and result['accessToken']:
+            #     self.logger.info("✅ Login session refreshed successfully")
+            #     self.is_logged_in = True
+            #     return True
+            # else:
+            #     self.logger.warning("❌ Failed to refresh login session")
+            #     self.is_logged_in = False
+            #     return False
                 
         except Exception as e:
-            self.logger.error(f"❌ Error refreshing login: {e}")
+            self.logger.error(f"❌ Error in refresh login: {e}")
             self.is_logged_in = False
             return False
     

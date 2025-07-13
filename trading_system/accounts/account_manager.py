@@ -35,7 +35,7 @@ class AccountManager:
     def discover_accounts(self) -> bool:
         """Discover all available accounts using proper Webull API"""
         try:
-            self.logger.info("🔍 Discovering Webull accounts automatically...")
+            self.logger.debug("🔍 Discovering Webull accounts automatically...")
             
             if not self.wb:
                 self.logger.error("❌ Webull session not initialized")
@@ -50,6 +50,8 @@ class AccountManager:
             response = self.wb._session.get(self.wb._urls.account_id(), headers=headers, timeout=self.wb.timeout)
             result = response.json()
             
+            self.logger.debug(f"Account discovery API response keys: {list(result.keys())}")
+            
             if not result.get('success') or not result.get('data'):
                 self.logger.error("❌ Failed to retrieve account list from Webull API")
                 self.logger.error(f"   Response: {result}")
@@ -60,18 +62,24 @@ class AccountManager:
             
             # Process each account automatically
             active_accounts = 0
-            for account_info in accounts_data:
+            for i, account_info in enumerate(accounts_data):
+                self.logger.debug(f"Processing account {i+1}: {account_info.get('secAccountId', 'Unknown ID')}")
+                
                 account_id = account_info.get('secAccountId')
                 status = account_info.get('status', 'Unknown')
+                rzone = account_info.get('rzone', 'dc_core_r001')  # Provide default
                 
-                self.logger.info(f"🔄 Processing account: {account_id} (status: {status})")
+                self.logger.debug(f"   Account ID: {account_id}")
+                self.logger.debug(f"   Status: {status}")
+                self.logger.debug(f"   RZone: {rzone}")
                 
                 if status != 'active' or not account_id:
-                    self.logger.info(f"⏭️ Skipping {status} account: {account_info.get('brokerName', 'Unknown')}")
+                    self.logger.debug(f"⏭️ Skipping {status} account: {account_info.get('brokerName', 'Unknown')}")
                     continue
                 
                 # Determine account type
                 account_type = self._determine_account_type(account_info)
+                self.logger.debug(f"   Determined account type: {account_type}")
                 
                 # Create AccountInfo object
                 account = AccountInfo(
@@ -81,15 +89,15 @@ class AccountManager:
                     broker_name=account_info.get('brokerName', 'Unknown'),
                     broker_account_id=account_info.get('brokerAccountId', 'N/A'),
                     is_default=account_info.get('isDefault', False),
-                    zone=str(account_info.get('rzone', 'dc_core_r001'))
+                    zone=str(rzone)  # Use the rzone from API response
                 )
                 
-                self.accounts[account_id] = account
+                self.accounts[str(account_id)] = account
                 active_accounts += 1
                 
                 # Load detailed account info
                 if self._load_account_details(account):
-                    self.logger.info(f"✅ {account_type} Account loaded: ${account.net_liquidation:.2f}")
+                    self.logger.debug(f"✅ {account_type} Account loaded: ${account.net_liquidation:.2f}")
                 else:
                     self.logger.warning(f"⚠️ Could not load details for {account_type} account")
             
@@ -102,27 +110,37 @@ class AccountManager:
             
         except Exception as e:
             self.logger.error(f"❌ Error discovering accounts: {str(e)}")
+            self.logger.debug(f"Full exception details:", exc_info=True)
             return False
     
     def _determine_account_type(self, account_info: Dict) -> str:
         """Determine account type from Webull API response"""
         # Try account types first
-        if 'accountTypes' in account_info:
+        if 'accountTypes' in account_info and account_info['accountTypes']:
             account_types = account_info['accountTypes']
             if account_types:
                 primary_type = account_types[0]
-                return self.account_type_mapping.get(primary_type, primary_type)
+                mapped_type = self.account_type_mapping.get(primary_type, primary_type)
+                self.logger.debug(f"   Account type from accountTypes: {primary_type} -> {mapped_type}")
+                return mapped_type
         
         # Fallback to broker name
         broker_name = account_info.get('brokerName', 'Unknown')
-        return self.broker_name_mapping.get(broker_name, broker_name)
+        mapped_type = self.broker_name_mapping.get(broker_name, broker_name)
+        self.logger.debug(f"   Account type from brokerName: {broker_name} -> {mapped_type}")
+        return mapped_type
     
     def _load_account_details(self, account: AccountInfo) -> bool:
         """Load detailed information for a specific account"""
         try:
+            self.logger.debug(f"Loading details for account {account.account_id} ({account.account_type})")
+            
             # Switch to this account
             self.wb._account_id = account.account_id
             self.wb.zone_var = account.zone
+            
+            self.logger.debug(f"   Set wb._account_id to: {self.wb._account_id}")
+            self.logger.debug(f"   Set wb.zone_var to: {self.wb.zone_var}")
             
             # Get account details
             account_data = self.wb.get_account()
@@ -131,10 +149,12 @@ class AccountManager:
                 self.logger.warning(f"⚠️ No account data returned for {account.account_id}")
                 return False
             
+            self.logger.debug(f"   Account data keys: {list(account_data.keys()) if isinstance(account_data, dict) else type(account_data)}")
+            
             # Extract net liquidation from TOP-LEVEL first
             if 'netLiquidation' in account_data:
                 account.net_liquidation = float(account_data['netLiquidation'])
-                self.logger.info(f"💰 Found top-level netLiquidation: ${account.net_liquidation:.2f}")
+                self.logger.debug(f"💰 Found top-level netLiquidation: ${account.net_liquidation:.2f}")
             else:
                 # Fallback to accountMembers
                 for member in account_data.get('accountMembers', []):
@@ -143,9 +163,11 @@ class AccountManager:
                     
                     if key == 'netLiquidation':
                         account.net_liquidation = float(value)
+                        self.logger.debug(f"💰 Found netLiquidation in accountMembers: ${account.net_liquidation:.2f}")
                         break
                     elif key == 'totalMarketValue':
                         account.net_liquidation = float(value)
+                        self.logger.debug(f"💰 Using totalMarketValue as netLiquidation: ${account.net_liquidation:.2f}")
                         break
             
             # Extract available funds based on account type
@@ -158,19 +180,19 @@ class AccountManager:
                 # For cash accounts, use settledFunds
                 if key == 'settledFunds' and account.account_type in ['Cash Account', 'CASH']:
                     account.settled_funds = float(value)
-                    self.logger.info(f"💵 Found settledFunds (cash): ${account.settled_funds:.2f}")
+                    self.logger.debug(f"💵 Found settledFunds (cash): ${account.settled_funds:.2f}")
                     break
                 
                 # For margin accounts, use cashBalance
                 elif key == 'cashBalance' and account.account_type in ['Margin Account', 'MRGN']:
                     account.settled_funds = float(value)
-                    self.logger.info(f"💵 Found cashBalance (margin): ${account.settled_funds:.2f}")
+                    self.logger.debug(f"💵 Found cashBalance (margin): ${account.settled_funds:.2f}")
                     break
                 
                 # Fallback: use cashBalance for any account if settledFunds not found
                 elif key == 'cashBalance' and account.settled_funds == 0:
                     account.settled_funds = float(value)
-                    self.logger.info(f"💵 Using cashBalance as fallback: ${account.settled_funds:.2f}")
+                    self.logger.debug(f"💵 Using cashBalance as fallback: ${account.settled_funds:.2f}")
             
             # If still no funds found, try alternative fields
             if account.settled_funds == 0:
@@ -180,7 +202,7 @@ class AccountManager:
                     
                     if key in ['dayBuyingPower', 'availableFunds', 'buyingPower']:
                         account.settled_funds = float(value)
-                        self.logger.info(f"💵 Using {key} as funds: ${account.settled_funds:.2f}")
+                        self.logger.debug(f"💵 Using {key} as funds: ${account.settled_funds:.2f}")
                         break
             
             # Extract positions
@@ -202,15 +224,16 @@ class AccountManager:
             self._load_day_trading_info(account)
             
             # Log final values
-            self.logger.info(f"📊 Final values for {account.account_type}:")
-            self.logger.info(f"   Net Liquidation: ${account.net_liquidation:.2f}")
-            self.logger.info(f"   Available Funds: ${account.settled_funds:.2f}")
-            self.logger.info(f"   Positions: {len(account.positions)}")
+            self.logger.debug(f"📊 Final values for {account.account_type}:")
+            self.logger.debug(f"   Net Liquidation: ${account.net_liquidation:.2f}")
+            self.logger.debug(f"   Available Funds: ${account.settled_funds:.2f}")
+            self.logger.debug(f"   Positions: {len(account.positions)}")
             
             return True
             
         except Exception as e:
             self.logger.error(f"❌ Error loading account details for {account.account_id}: {str(e)}")
+            self.logger.debug(f"Full exception details:", exc_info=True)
             return False
 
     def _load_day_trading_info(self, account: AccountInfo):
@@ -229,16 +252,16 @@ class AccountManager:
         for account in self.accounts.values():
             if account.is_enabled_for_trading(self.config):
                 enabled_accounts.append(account)
-                self.logger.info(f"✅ Account enabled for trading: {account.account_type} (${account.settled_funds:.2f})")
+                self.logger.debug(f"✅ Account enabled for trading: {account.account_type} (${account.settled_funds:.2f})")
             else:
-                self.logger.info(f"❌ Account disabled: {account.account_type}")
+                self.logger.debug(f"❌ Account disabled: {account.account_type}")
         
         return enabled_accounts
     
     def switch_to_account(self, account: AccountInfo) -> bool:
         """Switch trading context to specified account"""
         try:
-            self.logger.info(f"🔄 Switching to {account.account_type} account: {account.account_id}")
+            self.logger.debug(f"🔄 Switching to {account.account_type} account: {account.account_id}")
             
             # Switch Webull client to this account
             self.wb._account_id = account.account_id
@@ -247,7 +270,7 @@ class AccountManager:
             # Update current account
             self.current_account = account
             
-            self.logger.info(f"✅ Switched to {account.account_type} account")
+            self.logger.debug(f"✅ Switched to {account.account_type} account")
             
             return True
             
@@ -310,7 +333,7 @@ class AccountManager:
                 self.wb._account_id = self.original_account_id
                 self.wb.zone_var = self.original_zone
                 self.current_account = self.get_account_by_id(self.original_account_id)
-                self.logger.info("✅ Restored to original account context")
+                self.logger.debug("✅ Restored to original account context")
                 return True
             return False
         except Exception as e:
