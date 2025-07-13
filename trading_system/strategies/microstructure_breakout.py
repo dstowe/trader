@@ -70,21 +70,28 @@ class MicrostructureBreakoutStrategy:
             confidence = self._calculate_confidence(latest, data, 'BUY', symbol)
             atr_stop = latest['Close'] - (latest.get('atr', latest['Close'] * 0.02) * self.ATR_MULTIPLIER)
             
+            # Convert all values to JSON-serializable types
+            breakout_level = float(self._get_breakout_level(data))
+            volume_spike = float(self._get_volume_ratio(data))
+            atr_value = float(latest.get('atr', 0))
+            atr_stop_price = float(atr_stop)
+            spread_quality = str(self._estimate_spread_quality(symbol))
+            
             signals.append({
                 'symbol': symbol,
                 'date': latest_date,
                 'strategy': self.name,
                 'signal_type': 'BUY',
-                'price': latest['Close'],
-                'confidence': confidence,
+                'price': float(latest['Close']),
+                'confidence': float(confidence),
                 'reason': 'microstructure_breakout',
                 'metadata': json.dumps({
-                    'breakout_level': self._get_breakout_level(data),
-                    'volume_spike': self._get_volume_ratio(data),
-                    'atr': latest.get('atr', 0),
-                    'atr_stop': atr_stop,
-                    'spread_quality': self._estimate_spread_quality(symbol),
-                    'stop_loss': atr_stop,
+                    'breakout_level': breakout_level,
+                    'volume_spike': volume_spike,
+                    'atr': atr_value,
+                    'atr_stop': atr_stop_price,
+                    'spread_quality': spread_quality,
+                    'stop_loss': atr_stop_price,
                     'strategy_logic': 'microstructure_breakout'
                 })
             })
@@ -93,17 +100,22 @@ class MicrostructureBreakoutStrategy:
         sell_signal = self._check_breakout_sell_signal(latest, data, symbol)
         if sell_signal:
             confidence = self._calculate_confidence(latest, data, 'SELL', symbol)
+            
+            # Convert all values to JSON-serializable types
+            volume_exhaustion = bool(self._check_volume_exhaustion(data))
+            support_break = bool(self._check_support_break(data))
+            
             signals.append({
                 'symbol': symbol,
                 'date': latest_date,
                 'strategy': self.name,
                 'signal_type': 'SELL',
-                'price': latest['Close'],
-                'confidence': confidence,
+                'price': float(latest['Close']),
+                'confidence': float(confidence),
                 'reason': 'breakout_exhaustion_or_reversal',
                 'metadata': json.dumps({
-                    'volume_exhaustion': self._check_volume_exhaustion(data),
-                    'support_break': self._check_support_break(data)
+                    'volume_exhaustion': volume_exhaustion,
+                    'support_break': support_break
                 })
             })
         
@@ -228,7 +240,8 @@ class MicrostructureBreakoutStrategy:
         
         # Volume declining over last 3 bars
         if len(recent_volumes) >= 3:
-            return recent_volumes[2] < recent_volumes[1] < recent_volumes[0]
+            # Convert to standard Python bool to ensure JSON serialization
+            return bool(recent_volumes[2] < recent_volumes[1] < recent_volumes[0])
         
         return False
     
@@ -241,7 +254,8 @@ class MicrostructureBreakoutStrategy:
         support_level = data['Low'].tail(10).min()
         current_price = data['Close'].iloc[-1]
         
-        return current_price < support_level
+        # Convert to standard Python bool to ensure JSON serialization
+        return bool(current_price < support_level)
     
     def _calculate_confidence(self, latest: pd.Series, data: pd.DataFrame, 
                             signal_type: str, symbol: str) -> float:

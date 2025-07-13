@@ -19,8 +19,8 @@ class PersonalTradingConfig(TradingConfig):
     AUTOMATED_STRATEGY_MODE = 'FORCE_STRATEGY'  # Options: 'AUTO', 'FORCE_STRATEGY', 'FORCE_STOCK_LIST', 'CUSTOM'
     
     # Strategy Override Settings
-    FORCED_STRATEGY = 'MicrostructureBreakout'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STRATEGY'
-    FORCED_STOCK_LIST = 'MicrostructureBreakout'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STOCK_LIST'
+    FORCED_STRATEGY = 'GapTrading'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STRATEGY'
+    FORCED_STOCK_LIST = 'ValueRate'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STOCK_LIST'
     
     # Custom Override Settings (for advanced users)
     CUSTOM_STRATEGY_OVERRIDE = None     # Set to strategy name to override

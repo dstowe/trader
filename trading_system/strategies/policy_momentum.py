@@ -77,6 +77,7 @@ class PolicyMomentumStrategy:
                 'signal_type': 'BUY',
                 'price': float(latest['Close']),
                 'confidence': float(confidence),
+                'reason': 'policy_reversal_or_vix_spike',
                 'metadata': json.dumps({
                     'estimated_vix': float(estimated_vix),
                     'policy_momentum': policy_momentum,
