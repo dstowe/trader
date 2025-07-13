@@ -222,17 +222,3 @@ class InternationalStrategy:
         
         return min(confidence, 1.0)
     
-    def calculate_position_size(self, account_value: float, price: float) -> int:
-        """Calculate position size respecting international allocation limits"""
-        # Respect international allocation limit
-        max_international_allocation = getattr(self.config, 'MAX_INTERNATIONAL_ALLOCATION', 0.30)
-        max_position_value = account_value * max_international_allocation
-        
-        # Also respect general position sizing rules
-        max_general_position = account_value * self.config.MAX_POSITION_VALUE_PERCENT
-        
-        # Use the more restrictive limit
-        max_position_value = min(max_position_value, max_general_position)
-        
-        shares = int(max_position_value / price)
-        return max(shares, 1) if shares > 0 else 0

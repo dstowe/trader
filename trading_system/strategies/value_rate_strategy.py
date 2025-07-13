@@ -335,13 +335,3 @@ class ValueRateStrategy:
         
         return min(confidence, 1.0)
     
-    def calculate_position_size(self, account_value: float, price: float) -> int:
-        """Calculate position size for value rate plays"""
-        # Value plays can be held longer, so slightly larger positions
-        max_position_value = account_value * self.config.MAX_POSITION_VALUE_PERCENT
-        
-        # Slight bonus for value plays (they're typically less volatile)
-        max_position_value *= 1.1  # 10% bonus
-        
-        shares = int(max_position_value / price)
-        return max(shares, 1) if shares > 0 else 0

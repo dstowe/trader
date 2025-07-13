@@ -275,13 +275,3 @@ class PolicyMomentumStrategy:
         
         return min(confidence, 1.0)
     
-    def calculate_position_size(self, account_value: float, price: float) -> int:
-        """Calculate position size for policy momentum plays"""
-        # Standard position sizing (policy plays can be volatile)
-        max_position_value = account_value * self.config.MAX_POSITION_VALUE_PERCENT
-        
-        # Slightly reduce size for high volatility plays
-        max_position_value *= 0.9  # 10% reduction for volatility
-        
-        shares = int(max_position_value / price)
-        return max(shares, 1) if shares > 0 else 0

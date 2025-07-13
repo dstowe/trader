@@ -139,8 +139,3 @@ class BollingerMeanReversionStrategy:
         
         return min(confidence, 1.0)
     
-    def calculate_position_size(self, account_value: float, price: float) -> int:
-        """Calculate position size based on risk management rules"""
-        max_position_value = account_value * self.config.MAX_POSITION_SIZE
-        shares = int(max_position_value / price)
-        return max(shares, 1) if shares > 0 else 0

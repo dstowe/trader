@@ -273,21 +273,3 @@ class GapTradingStrategy:
         
         return min(confidence, 1.0)
     
-    def calculate_position_size(self, account_value: float, price: float, 
-                              gap_classification: Dict) -> int:
-        """Calculate position size based on gap volatility"""
-        # Reduce position size for larger gaps (higher volatility)
-        gap_size = gap_classification['gap_size']
-        
-        base_position_value = account_value * self.config.MAX_POSITION_SIZE
-        
-        # Adjust for gap size (larger gaps = smaller positions)
-        if gap_size > self.config.GAP_LARGE_SIZE:
-            position_value = base_position_value * 0.5  # 50% of normal
-        elif gap_size > self.config.GAP_MIN_SIZE * 2:
-            position_value = base_position_value * 0.75  # 75% of normal
-        else:
-            position_value = base_position_value  # Normal size
-        
-        shares = int(position_value / price)
-        return max(shares, 1) if shares > 0 else 0

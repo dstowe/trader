@@ -27,10 +27,10 @@ class PersonalTradingConfig:
     
     # Account sizing and risk management
     ACCOUNT_SIZE = float(os.getenv('ACCOUNT_SIZE', 10000))
-    MAX_POSITION_SIZE = 0.10  # Legacy name for backward compatibility with strategies
+    # MAX_POSITION_SIZE = 0.10  # Legacy name for backward compatibility with strategies
     MAX_POSITION_VALUE_PERCENT = 0.5    # 50% max of account per position (AUTHORITATIVE)
     MIN_POSITION_VALUE = 1              # Minimum $1 position
-    MAX_POSITIONS = 5                   # Legacy name for backward compatibility
+    # MAX_POSITIONS = 5                   # Legacy name for backward compatibility
     MAX_POSITIONS_TOTAL = 8             # Maximum 8 total positions (AUTHORITATIVE)
     
     # Risk management
@@ -475,7 +475,7 @@ class PersonalTradingConfig:
         
         # 7. Check if we're at max positions
         if signal_type == 'BUY' and current_positions:
-            if len(current_positions) >= cls.MAX_POSITIONS_TOTAL:
+            if len(current_positions) >= cls.MAX_POSITIONS_TOTAL:  # Use authoritative parameter
                 return False, f"At maximum positions: {len(current_positions)}/{cls.MAX_POSITIONS_TOTAL}"
         
         return True, "Signal meets all criteria including personal trading rules"
@@ -542,11 +542,11 @@ class PersonalTradingConfig:
         
         return False
     
-    @classmethod
+    @classmethod 
     def get_position_size(cls, signal_price, account_value, settled_funds):
         """Calculate optimal position size with safety buffer for fractional orders"""
         # Use the actual account value (netLiquidation) for percentage calculations
-        max_by_percentage = account_value * cls.MAX_POSITION_VALUE_PERCENT
+        max_by_percentage = account_value * cls.MAX_POSITION_VALUE_PERCENT  # Use authoritative parameter
         max_by_funds = settled_funds
         
         max_position_value = min(max_by_percentage, max_by_funds)
@@ -718,6 +718,112 @@ class PersonalTradingConfig:
             'min_fractional_order': cls.MIN_FRACTIONAL_ORDER,
             'rule_enforcement_active': True
         }
+
+    @classmethod
+    def get_position_size_with_strategy_adjustments(cls, signal_price, account_value, settled_funds, 
+                                                strategy_name=None, signal_metadata=None):
+        """
+        Calculate position size with optional strategy-specific adjustments
+        
+        Args:
+            signal_price: Price per share/unit
+            account_value: Total account value (net liquidation)
+            settled_funds: Available settled funds
+            strategy_name: Name of strategy (for strategy-specific adjustments)
+            signal_metadata: Additional signal metadata for adjustments
+            
+        Returns:
+            Dict with position sizing information including strategy adjustments
+        """
+        # Get base position size using the authoritative method
+        base_position = cls.get_position_size(signal_price, account_value, settled_funds)
+        
+        # If base position is 'none', return as-is
+        if base_position['type'] == 'none':
+            return base_position
+        
+        # Apply strategy-specific adjustments
+        adjustment_factor = 1.0
+        adjustment_reason = "Standard sizing"
+        
+        if strategy_name and signal_metadata:
+            if strategy_name in ['BullishMomentumDip', 'BullishMomentumDipStrategy']:
+                # Momentum strategies can be more aggressive
+                adjustment_factor = 1.1
+                adjustment_reason = "Momentum strategy bonus (+10%)"
+                
+            elif strategy_name == 'GapTrading':
+                # Adjust based on gap size (more volatile = smaller position)
+                gap_size = signal_metadata.get('gap_size', 0)
+                if gap_size and gap_size > cls.GAP_LARGE_SIZE:
+                    adjustment_factor = 0.5  # 50% of normal
+                    adjustment_reason = f"Large gap volatility reduction (-50%, gap: {gap_size:.1%})"
+                elif gap_size and gap_size > cls.GAP_MIN_SIZE * 2:
+                    adjustment_factor = 0.75  # 75% of normal  
+                    adjustment_reason = f"Medium gap volatility reduction (-25%, gap: {gap_size:.1%})"
+                    
+            elif strategy_name in ['PolicyMomentum', 'PolicyMomentumStrategy']:
+                # Slightly reduce for volatility
+                adjustment_factor = 0.9
+                adjustment_reason = "Policy volatility reduction (-10%)"
+                
+            elif strategy_name in ['ValueRate', 'ValueRateStrategy']:
+                # Value plays can be held longer, slight increase
+                adjustment_factor = 1.1
+                adjustment_reason = "Value play bonus (+10%)"
+                
+            elif strategy_name in ['SectorRotation', 'SectorRotationStrategy']:
+                # Apply sector allocation limit check
+                max_sector_allocation = getattr(cls, 'MAX_SECTOR_ALLOCATION', 0.20)
+                sector_limit_factor = max_sector_allocation / cls.MAX_POSITION_VALUE_PERCENT
+                if sector_limit_factor < 1.0:
+                    adjustment_factor = sector_limit_factor
+                    adjustment_reason = f"Sector allocation limit (max {max_sector_allocation:.0%})"
+                else:
+                    adjustment_factor = 0.95
+                    adjustment_reason = "Sector concentration adjustment (-5%)"
+                    
+            elif strategy_name in ['International', 'InternationalStrategy']:
+                # Apply international allocation limit check
+                max_intl_allocation = getattr(cls, 'MAX_INTERNATIONAL_ALLOCATION', 0.30)
+                intl_limit_factor = max_intl_allocation / cls.MAX_POSITION_VALUE_PERCENT
+                if intl_limit_factor < 1.0:
+                    adjustment_factor = intl_limit_factor
+                    adjustment_reason = f"International allocation limit (max {max_intl_allocation:.0%})"
+                else:
+                    adjustment_factor = 0.95
+                    adjustment_reason = "International concentration adjustment (-5%)"
+        
+        # Apply the adjustment
+        adjusted_position = base_position.copy()
+        
+        if base_position['type'] == 'dollars':
+            # Fractional order - adjust dollar amount
+            adjusted_amount = round(base_position['amount'] * adjustment_factor, 2)
+        else:
+            # Whole share order - adjust share count but keep as integer
+            adjusted_amount = max(1, int(base_position['amount'] * adjustment_factor))
+        
+        adjusted_position['amount'] = adjusted_amount
+        adjusted_position['strategy_adjustment'] = {
+            'factor': adjustment_factor,
+            'reason': adjustment_reason,
+            'original_amount': base_position['amount'],
+            'strategy_name': strategy_name
+        }
+        
+        # Ensure we don't go below minimum thresholds after adjustment
+        if adjusted_position['type'] == 'dollars':
+            if adjusted_position['amount'] < cls.MIN_FRACTIONAL_ORDER:
+                adjusted_position['type'] = 'none'
+                adjusted_position['amount'] = 0
+                adjusted_position['reason'] = f"Adjusted amount ${adjusted_position['amount']:.2f} below minimum ${cls.MIN_FRACTIONAL_ORDER:.2f}"
+        elif adjusted_position['type'] == 'shares':
+            if adjusted_position['amount'] < 1:
+                adjusted_position['amount'] = 1  # Minimum 1 share
+                adjusted_position['strategy_adjustment']['reason'] += " (min 1 share enforced)"
+        
+        return adjusted_position 
 
 
 # Example usage and validation

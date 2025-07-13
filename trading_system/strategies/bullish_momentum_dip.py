@@ -369,13 +369,3 @@ class BullishMomentumDipStrategy:
         
         return min(confidence, 1.0)
     
-    def calculate_position_size(self, account_value: float, price: float) -> int:
-        """Calculate position size for momentum dip plays"""
-        # Momentum strategies can be more aggressive with position sizing
-        max_position_value = account_value * getattr(self.config, 'MAX_POSITION_VALUE_PERCENT', 0.1)
-        
-        # Slight bonus for high-confidence momentum plays
-        max_position_value *= 1.1  # 10% bonus
-        
-        shares = int(max_position_value / price)
-        return max(shares, 1) if shares > 0 else 0

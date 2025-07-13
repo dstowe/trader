@@ -291,7 +291,7 @@ class EnhancedAutomatedTradingSystem:
         return scan_universe
     
     def filter_signals_for_account(self, signals: List[Dict], account: AccountInfo) -> List[Dict]:
-        """Filter signals for specific account using PersonalTradingConfig rule enforcement (SINGLE SOURCE OF TRUTH)"""
+        """Filter signals for specific account using PersonalTradingConfig rule enforcement"""
         filtered_signals = []
         position_symbols = [pos['symbol'] for pos in account.positions]
         account_trades = [t for t in self.todays_trades if t.get('account_id') == account.account_id]
@@ -322,16 +322,31 @@ class EnhancedAutomatedTradingSystem:
                 self.logger.debug(f"🚨 {account.account_type}: BUY-AND-HOLD PROTECTION for {symbol}")
                 continue
             
-            # Position sizing for BUY signals using PersonalTradingConfig method (AUTHORITATIVE)
+            # Position sizing for BUY signals using CENTRALIZED method (UPDATED)
             if signal_type == 'BUY':
-                position_info = self.config.get_position_size(
+                # Extract strategy name and metadata for position adjustments
+                strategy_name = signal.get('strategy', 'Unknown')
+                signal_metadata = {}
+                
+                # Parse metadata if it exists
+                if 'metadata' in signal:
+                    try:
+                        import json
+                        signal_metadata = json.loads(signal['metadata']) if isinstance(signal['metadata'], str) else signal['metadata']
+                    except:
+                        signal_metadata = {}
+                
+                # Use centralized position sizing with strategy adjustments
+                position_info = self.config.get_position_size_with_strategy_adjustments(
                     signal['price'], 
                     account.net_liquidation, 
-                    account.settled_funds
+                    account.settled_funds,
+                    strategy_name=strategy_name,
+                    signal_metadata=signal_metadata
                 )
                 
                 if position_info['type'] == 'none':
-                    self.logger.debug(f"⚠️ {account.account_type}: Insufficient funds for {symbol}")
+                    self.logger.debug(f"⚠️ {account.account_type}: Insufficient funds for {symbol} - {position_info.get('reason', 'Unknown')}")
                     continue
                 
                 signal['calculated_position_info'] = position_info
@@ -359,13 +374,26 @@ class EnhancedAutomatedTradingSystem:
                     self.logger.error(f"❌ Failed to switch to {account.account_type}")
                     return False
                 
-                # Calculate position sizing using PersonalTradingConfig (AUTHORITATIVE)
+                # Calculate position sizing using CENTRALIZED method (UPDATED)
                 if signal_type == 'BUY':
                     if 'calculated_position_info' in signal:
+                        # Use pre-calculated position info from filtering stage
                         position_info = signal['calculated_position_info']
                     else:
-                        position_info = self.config.get_position_size(
-                            price, account.net_liquidation, account.settled_funds
+                        # Fallback: calculate on-demand using centralized method
+                        strategy_name = signal.get('strategy', 'Unknown')
+                        signal_metadata = {}
+                        
+                        if 'metadata' in signal:
+                            try:
+                                import json
+                                signal_metadata = json.loads(signal['metadata']) if isinstance(signal['metadata'], str) else signal['metadata']
+                            except:
+                                signal_metadata = {}
+                        
+                        position_info = self.config.get_position_size_with_strategy_adjustments(
+                            price, account.net_liquidation, account.settled_funds,
+                            strategy_name=strategy_name, signal_metadata=signal_metadata
                         )
                     
                     if position_info['type'] == 'none':
@@ -376,12 +404,18 @@ class EnhancedAutomatedTradingSystem:
                         # Fractional share order
                         quantity = position_info['amount']  # Dollar amount for fractional
                         self.logger.info(f"Using fractional order: ${quantity} worth of {symbol}")
+                        if 'strategy_adjustment' in position_info:
+                            adj = position_info['strategy_adjustment']
+                            self.logger.info(f"Applied {adj['reason']}: {adj['factor']:.2f}x (${adj['original_amount']:.2f} → ${quantity})")
                     else:
                         # Whole share order
                         quantity = position_info['amount']
+                        if 'strategy_adjustment' in position_info:
+                            adj = position_info['strategy_adjustment']
+                            self.logger.info(f"Applied {adj['reason']}: {adj['factor']:.2f}x ({adj['original_amount']:.0f} → {quantity:.0f} shares)")
                     
                 elif signal_type == 'SELL':
-                    # Find position to sell
+                    # Find position to sell (unchanged)
                     position = None
                     for pos in account.positions:
                         if pos['symbol'] == symbol:
@@ -396,7 +430,7 @@ class EnhancedAutomatedTradingSystem:
                 
                 # Execute the order using PersonalTradingConfig order type (AUTHORITATIVE)
                 order_type = self.config.FRACTIONAL_ORDER_TYPE
-                self.logger.info(f"Placing {signal_type} order: {quantity} shares of {symbol} on {account.account_type} ({order_type})")
+                self.logger.info(f"Placing {signal_type} order: {quantity} {'dollars' if signal_type == 'BUY' and position_info['type'] == 'dollars' else 'shares'} of {symbol} on {account.account_type} ({order_type})")
                 
                 order_result = self.wb.place_order(
                     stock=symbol,
