@@ -694,6 +694,8 @@ class PersonalTradingConfig:
             'available_position_slots': max(0, cls.MAX_POSITIONS_TOTAL - len(current_positions))
         }
     
+
+    
     @classmethod
     def format_signal_display(cls, signal, position_data=None):
         """Format signal for display with fractional share information"""

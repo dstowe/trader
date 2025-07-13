@@ -44,32 +44,7 @@ class AccountInfo:
             'available_position_slots': max(0, config.MAX_POSITIONS_TOTAL - len(self.positions))
         }
     
-    def get_fractional_capability_info(self, config) -> Dict:
-        """Get information about fractional share capabilities"""
-        max_position = self.net_liquidation * config.MAX_POSITION_VALUE_PERCENT
-        available_for_position = min(max_position, self.settled_funds)
-        
-        # Fractional capability thresholds
-        can_make_any_position = available_for_position >= config.MIN_FRACTIONAL_ORDER
-        can_make_meaningful_position = available_for_position >= config.MIN_POSITION_VALUE
-        
-        # Calculate how many different stocks we could theoretically buy
-        if can_make_any_position:
-            max_fractional_positions = int(self.settled_funds / config.MIN_FRACTIONAL_ORDER)
-        else:
-            max_fractional_positions = 0
-        
-        return {
-            'fractional_enabled': True,
-            'can_buy_any_stock': can_make_any_position,
-            'can_make_meaningful_position': can_make_meaningful_position,
-            'min_order_amount': config.MIN_FRACTIONAL_ORDER,
-            'min_position_value': config.MIN_POSITION_VALUE,
-            'max_position_amount': available_for_position,
-            'theoretical_max_positions': min(max_fractional_positions, config.MAX_POSITIONS_TOTAL),
-            'funds_needed_for_min': max(0, config.MIN_FRACTIONAL_ORDER - self.settled_funds),
-            'buffer_percentage': config.FRACTIONAL_FUND_BUFFER * 100
-        }
+
     
     def is_enabled_for_trading(self, config) -> bool:
         """Check if this account is enabled for trading based on config"""
