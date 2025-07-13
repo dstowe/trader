@@ -1,4 +1,7 @@
 # config/rule_engine.py
+from typing import Dict
+from base_config import ConfigurationManager
+
 class TradingRuleEngine:
     """Separate rule validation from configuration"""
     

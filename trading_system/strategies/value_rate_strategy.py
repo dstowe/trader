@@ -5,7 +5,10 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import json
 
-class ValueRateStrategy:
+# Import the base strategy classes
+from .base_strategy import TradingStrategy, TradingSignal
+
+class ValueRateStrategy(TradingStrategy):
     """
     Value Rate Strategy - Rate-Sensitive Value Plays
     

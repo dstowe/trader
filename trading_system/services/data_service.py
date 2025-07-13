@@ -1,4 +1,8 @@
 # services/data_service.py
+from repositories.signal_repository import SignalRepository, SignalEntity
+from repositories.position_repository import PositionRepository
+from typing import List, Dict
+
 class DataService:
     """Service layer that coordinates repository operations"""
     

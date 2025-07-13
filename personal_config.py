@@ -275,6 +275,20 @@ class PersonalTradingConfig:
     # =================================================================
     # AUTHORITATIVE CONFIGURATION METHODS
     # =================================================================
+    @classmethod
+    def get_stock_list_for_data_fetch(cls) -> List[str]:
+        """Get stock list for data fetching"""
+        try:
+            from trading_system.config.stock_lists import StockLists
+            return StockLists.BOLLINGER_MEAN_REVERSION[:20]  # Limit for testing
+        except ImportError:
+            return ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA']
+
+    @classmethod  
+    def get_recommended_strategy_override(cls) -> str:
+        """Get recommended strategy override"""
+        strategy_override, _ = cls.get_automated_strategy_override()
+        return strategy_override
     
     @classmethod
     def get_all_config_summary(cls) -> Dict:

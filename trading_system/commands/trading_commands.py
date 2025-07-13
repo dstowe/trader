@@ -1,6 +1,8 @@
 # commands/trading_commands.py
 import time
 from datetime import datetime
+from base_command import Command
+from base_command import CommandResult
 
 class AuthenticateCommand(Command):
     """Command to handle authentication"""

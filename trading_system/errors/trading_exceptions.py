@@ -1,4 +1,7 @@
 # errors/trading_exceptions.py
+
+from datetime import datetime
+
 class TradingSystemError(Exception):
     """Base exception for trading system"""
     def __init__(self, message: str, error_code: str = None, context: dict = None):

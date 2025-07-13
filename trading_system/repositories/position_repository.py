@@ -1,4 +1,9 @@
 # repositories/position_repository.py
+from dataclasses import dataclass
+from datetime import datetime
+from typing import List, Dict, Optional
+from base_repository import BaseRepository
+
 @dataclass
 class PositionEntity:
     """Domain entity for positions"""

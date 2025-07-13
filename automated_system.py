@@ -18,11 +18,28 @@ from typing import List, Dict
 # Add the project root to Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from trading_system import TradingSystem, StockLists
-from trading_system.webull.webull import webull
-from trading_system.database.models import DatabaseManager
-from trading_system.auth import CredentialManager, LoginManager, SessionManager
-from trading_system.accounts import AccountManager, AccountInfo
+
+try:
+    from trading_system import TradingSystem, StockLists
+    from trading_system.webull.webull import webull
+    from trading_system.database.models import DatabaseManager
+    from trading_system.auth import CredentialManager, LoginManager, SessionManager
+    from trading_system.accounts import AccountManager, AccountInfo
+    TRADING_SYSTEM_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Warning: Trading system imports failed: {e}")
+    TRADING_SYSTEM_AVAILABLE = False
+    
+    # Create minimal fallback
+    class TradingSystem:
+        def __init__(self, config=None): 
+            self.config = config
+        def run_daily_analysis(self, **kwargs): 
+            return {'error': 'TradingSystem not available'}
+
+# Import PersonalTradingConfig
+from personal_config import PersonalTradingConfig
+
 
 # SINGLE SOURCE OF TRUTH: PersonalTradingConfig
 from personal_config import PersonalTradingConfig
