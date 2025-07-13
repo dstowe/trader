@@ -1,8 +1,9 @@
-# strategies/base_strategy.py
+# trading_system/strategies/base_strategy.py - FIXED VERSION
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 import pandas as pd
 from dataclasses import dataclass
+from datetime import datetime
 
 @dataclass
 class TradingSignal:
@@ -29,19 +30,18 @@ class TradingSignal:
 class TradingStrategy(ABC):
     """Abstract base class for all trading strategies"""
     
-    def __init__(self, name: str, config_manager):
-        self.name = name
-        self.config = config_manager
+    def __init__(self, config):
+        self.config = config
+        self.name = self.__class__.__name__
         
     @abstractmethod
     def generate_signals(self, data: pd.DataFrame, symbol: str) -> List[TradingSignal]:
         """Generate trading signals for given data"""
         pass
     
-    @abstractmethod
     def get_required_indicators(self) -> List[str]:
         """Return list of required technical indicators"""
-        pass
+        return ['Close', 'Volume', 'Open', 'High', 'Low']
     
     def validate_data(self, data: pd.DataFrame) -> bool:
         """Validate that data contains required indicators"""
@@ -63,7 +63,6 @@ class TradingStrategy(ABC):
             'min_data_points': self.get_min_data_points()
         }
     
-    @abstractmethod
     def get_min_data_points(self) -> int:
         """Minimum data points required for strategy"""
-        pass
+        return 20  # Default minimum
