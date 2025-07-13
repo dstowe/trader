@@ -1,7 +1,8 @@
-# personal_config.py
+# personal_config.py - COMPLETE VERSION WITH AUTOMATED SYSTEM OVERRIDES
 """
-Personal Trading Configuration with Enhanced Rule Enforcement
+Personal Trading Configuration with Enhanced Rule Enforcement and Strategy Overrides
 Extends the base TradingConfig with personal preferences and strict rule enforcement
+Now includes full automated system strategy override support
 """
 
 import os
@@ -10,6 +11,29 @@ from typing import List, Dict, Tuple, Any
 from trading_system.config.settings import TradingConfig
 
 class PersonalTradingConfig(TradingConfig):
+    # =================================================================
+    # AUTOMATED SYSTEM CONTROL SETTINGS (NEW)
+    # =================================================================
+    
+    # Strategy Selection Mode for Automated System
+    AUTOMATED_STRATEGY_MODE = 'FORCE_STRATEGY'  # Options: 'AUTO', 'FORCE_STRATEGY', 'FORCE_STOCK_LIST', 'CUSTOM'
+    
+    # Strategy Override Settings
+    FORCED_STRATEGY = 'PolicyMomentum'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STRATEGY'
+    FORCED_STOCK_LIST = 'PolicyMomentum'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STOCK_LIST'
+    
+    # Custom Override Settings (for advanced users)
+    CUSTOM_STRATEGY_OVERRIDE = None     # Set to strategy name to override
+    CUSTOM_STOCK_LIST_OVERRIDE = None   # Set to stock list name to override
+    
+    # Automated System Behavior Controls
+    ENABLE_STRATEGY_RETRY = True        # Retry with different strategy if first fails
+    FALLBACK_STRATEGY = 'BollingerMeanReversion'  # Strategy to use if preferred fails
+    MAX_STRATEGY_ATTEMPTS = 2           # How many strategies to try before giving up
+    
+    # Market Condition Override
+    IGNORE_MARKET_CONDITIONS = True    # If True, always use FORCED_STRATEGY regardless of market
+    
     # =================================================================
     # PERSONAL TRADING RULES (CRITICAL - NEVER OVERRIDE) - CLASS LEVEL
     # =================================================================
@@ -21,7 +45,7 @@ class PersonalTradingConfig(TradingConfig):
     
     # Position Management
     MAX_POSITION_VALUE_PERCENT = 0.5  # 50% max of account per position
-    MIN_POSITION_VALUE = 1          # Minimum $5 position
+    MIN_POSITION_VALUE = 1          # Minimum $1 position
     MAX_POSITIONS_TOTAL = 8            # Maximum 8 total positions
     
     # Risk Management (Personal)
@@ -202,6 +226,107 @@ class PersonalTradingConfig(TradingConfig):
             # ETFs
             'SPY', 'QQQ', 'VTV', 'SCHD'
         ]
+
+    # =================================================================
+    # AUTOMATED SYSTEM CONTROL METHODS
+    # =================================================================
+    
+    @classmethod
+    def get_automated_strategy_override(cls) -> Tuple[str, str]:
+        """
+        Get strategy and stock list overrides for automated system
+        
+        Returns:
+            Tuple of (strategy_override, stock_list_override)
+            Both can be None if AUTO mode is selected
+        """
+        strategy_override = None
+        stock_list_override = None
+        
+        if cls.AUTOMATED_STRATEGY_MODE == 'AUTO':
+            # Let the system choose automatically based on market conditions
+            strategy_override = None
+            stock_list_override = None
+            
+        elif cls.AUTOMATED_STRATEGY_MODE == 'FORCE_STRATEGY':
+            # Force a specific strategy
+            strategy_override = cls.FORCED_STRATEGY
+            stock_list_override = None
+            
+        elif cls.AUTOMATED_STRATEGY_MODE == 'FORCE_STOCK_LIST':
+            # Force a specific stock list (let strategy be auto-selected)
+            strategy_override = None
+            stock_list_override = cls.FORCED_STOCK_LIST
+            
+        elif cls.AUTOMATED_STRATEGY_MODE == 'CUSTOM':
+            # Use custom overrides (for advanced users)
+            strategy_override = cls.CUSTOM_STRATEGY_OVERRIDE
+            stock_list_override = cls.CUSTOM_STOCK_LIST_OVERRIDE
+            
+        return strategy_override, stock_list_override
+    
+    @classmethod
+    def should_ignore_market_conditions(cls) -> bool:
+        """Check if market conditions should be ignored for strategy selection"""
+        return cls.IGNORE_MARKET_CONDITIONS
+    
+    @classmethod
+    def get_fallback_strategy(cls) -> str:
+        """Get the fallback strategy if preferred strategy fails"""
+        return cls.FALLBACK_STRATEGY
+    
+    @classmethod
+    def get_automated_system_summary(cls) -> Dict:
+        """Get summary of automated system configuration"""
+        strategy_override, stock_list_override = cls.get_automated_strategy_override()
+        
+        return {
+            'mode': cls.AUTOMATED_STRATEGY_MODE,
+            'strategy_override': strategy_override,
+            'stock_list_override': stock_list_override,
+            'ignore_market_conditions': cls.IGNORE_MARKET_CONDITIONS,
+            'enable_retry': cls.ENABLE_STRATEGY_RETRY,
+            'fallback_strategy': cls.FALLBACK_STRATEGY,
+            'max_attempts': cls.MAX_STRATEGY_ATTEMPTS,
+            'forced_strategy': cls.FORCED_STRATEGY,
+            'forced_stock_list': cls.FORCED_STOCK_LIST
+        }
+    
+    @classmethod
+    def validate_strategy_override(cls, strategy_name: str) -> bool:
+        """Validate that a strategy override is valid"""
+        valid_strategies = [
+            'BollingerMeanReversion',
+            'GapTrading', 
+            'BullishMomentumDipStrategy',
+            'BullishMomentumDip',
+            'InternationalStrategy',
+            'International',
+            'MicrostructureBreakoutStrategy', 
+            'MicrostructureBreakout',
+            'PolicyMomentumStrategy',
+            'PolicyMomentum',
+            'SectorRotationStrategy',
+            'SectorRotation',
+            'ValueRateStrategy',
+            'ValueRate'
+        ]
+        return strategy_name in valid_strategies
+    
+    @classmethod
+    def validate_stock_list_override(cls, stock_list_name: str) -> bool:
+        """Validate that a stock list override is valid"""
+        valid_stock_lists = [
+            'BollingerMeanReversion',
+            'GapTrading',
+            'Core',
+            'International',
+            'SectorRotation',
+            'ValueRate',
+            'MicrostructureBreakout',
+            'PolicyMomentum'
+        ]
+        return stock_list_name in valid_stock_lists
 
     # =================================================================
     # ENHANCED RULE ENFORCEMENT METHODS
@@ -686,8 +811,8 @@ def validate_personal_config():
     """Validate personal configuration settings"""
     config = PersonalTradingConfig()
     
-    print("🔧 Personal Trading Configuration")
-    print("=" * 40)
+    print("🔧 PERSONAL TRADING CONFIGURATION")
+    print("=" * 50)
     print(f"Short Selling: {'❌ BLOCKED' if not config.ALLOW_SHORT_SELLING else '✅ Enabled'}")
     print(f"Day Trading: {'❌ BLOCKED' if not config.ALLOW_DAY_TRADING else '✅ Enabled'}")
     print(f"Max Position: {config.MAX_POSITION_VALUE_PERCENT:.1%} of account")
@@ -699,9 +824,23 @@ def validate_personal_config():
     print(f"Trading Hours: {config.TRADING_START_TIME} - {config.TRADING_END_TIME}")
     print(f"Watchlist: {len(config.PERSONAL_WATCHLIST)} stocks")
     
+    print("\n🤖 AUTOMATED SYSTEM CONFIGURATION")
+    print("=" * 50)
+    
+    # Get current automated system settings
+    summary = config.get_automated_system_summary()
+    
+    print(f"Strategy Mode: {summary['mode']}")
+    print(f"Strategy Override: {summary['strategy_override']}")
+    print(f"Stock List Override: {summary['stock_list_override']}")
+    print(f"Ignore Market Conditions: {summary['ignore_market_conditions']}")
+    print(f"Enable Retry: {summary['enable_retry']}")
+    print(f"Fallback Strategy: {summary['fallback_strategy']}")
+    print(f"Max Attempts: {summary['max_attempts']}")
+    
     # Test rule enforcement
     print(f"\n🛡️ RULE ENFORCEMENT TEST")
-    print("=" * 40)
+    print("=" * 50)
     
     # Test short selling detection
     is_violation, reason = config.check_short_selling_violation('SELL', [], 'AAPL')
@@ -739,8 +878,8 @@ def validate_personal_config():
         print(f"Violations: {'; '.join(violations)}")
     
     # Test position sizing
-    print(f"\n💰 Position Sizing Test")
-    print("=" * 40)
+    print(f"\n💰 POSITION SIZING TEST")
+    print("=" * 50)
     position_info = config.get_position_size(150.0, 10000, 1000)
     print(f"Stock Price: $150.00")
     print(f"Account Value: $10,000")
@@ -748,6 +887,29 @@ def validate_personal_config():
     print(f"Position Type: {position_info['type']}")
     print(f"Position Amount: {position_info['amount']}")
     print(f"Is Fractional: {position_info['is_fractional']}")
+    
+    print(f"\n📋 AVAILABLE STRATEGY MODES:")
+    print("  • AUTO: Let system choose based on market conditions")
+    print("  • FORCE_STRATEGY: Always use specific strategy")
+    print("  • FORCE_STOCK_LIST: Use specific stock list, auto strategy")
+    print("  • CUSTOM: Use custom strategy and stock list overrides")
+    
+    print(f"\n🎯 AVAILABLE STRATEGIES:")
+    strategies = [
+        'BollingerMeanReversion', 'GapTrading', 'BullishMomentumDipStrategy',
+        'International', 'MicrostructureBreakout', 'PolicyMomentum',
+        'SectorRotation', 'ValueRateStrategy'
+    ]
+    for strategy in strategies:
+        print(f"  • {strategy}")
+    
+    print(f"\n📊 AVAILABLE STOCK LISTS:")
+    stock_lists = [
+        'BollingerMeanReversion', 'GapTrading', 'Core', 'International',
+        'SectorRotation', 'ValueRate', 'MicrostructureBreakout', 'PolicyMomentum'
+    ]
+    for stock_list in stock_lists:
+        print(f"  • {stock_list}")
 
 if __name__ == "__main__":
     validate_personal_config()

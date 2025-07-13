@@ -1,11 +1,12 @@
-# automated_system.py (Refactored)
+# automated_system.py (Enhanced with Strategy Override Support)
 """
 Enhanced Automated Multi-Account Personal Trading System
+Now includes strategy override support from PersonalTradingConfig
 Fully integrated with PersonalTradingConfig for consistent rule enforcement
 Runs daily at configured trading hours via Windows Task Scheduler
 No user interaction required - respects all personal trading preferences
 
-Refactored version with modular authentication and account management
+Enhanced version with strategy override capabilities
 """
 
 import sys
@@ -30,6 +31,7 @@ from personal_config import PersonalTradingConfig
 class EnhancedAutomatedTradingSystem:
     """
     Enhanced Automated Multi-Account Trading System
+    Now with configurable strategy override support from PersonalTradingConfig
     Fully integrated with PersonalTradingConfig for complete consistency
     Now with modular authentication and account management
     """
@@ -67,6 +69,10 @@ class EnhancedAutomatedTradingSystem:
         # Load rule enforcement summary (reduced to DEBUG level)
         self.rule_summary = self.config.get_rule_enforcement_summary()
         self.logger.debug(f"🛡️ Rule Enforcement Active: {self.rule_summary}")
+        
+        # NEW: Load automated system configuration
+        self.automated_config = self.config.get_automated_system_summary()
+        self.logger.info(f"🤖 Automated System Config: {self.automated_config}")
         
     def load_todays_trades(self):
         """Load today's trades for day trading detection across all accounts"""
@@ -613,12 +619,23 @@ class EnhancedAutomatedTradingSystem:
             self.logger.error(f"Error syncing enhanced positions: {e}")
     
     def run_enhanced_automated_analysis(self):
-        """Enhanced automated analysis with full PersonalTradingConfig integration"""
+        """Enhanced automated analysis with strategy override support"""
         start_time = datetime.now()
         
         try:
             self.logger.info("🛡️ ENHANCED AUTOMATED MULTI-ACCOUNT TRADING SYSTEM")
             self.logger.info("=" * 80)
+            
+            # NEW: Log automated system configuration
+            self.logger.info(f"🤖 Strategy Mode: {self.automated_config['mode']}")
+            if self.automated_config['strategy_override']:
+                self.logger.info(f"🎯 Forced Strategy: {self.automated_config['strategy_override']}")
+            if self.automated_config['stock_list_override']:
+                self.logger.info(f"📊 Forced Stock List: {self.automated_config['stock_list_override']}")
+            self.logger.info(f"🚫 Ignore Market Conditions: {self.automated_config['ignore_market_conditions']}")
+            self.logger.info(f"🔄 Enable Retry: {self.automated_config['enable_retry']}")
+            self.logger.info(f"🛡️ Fallback Strategy: {self.automated_config['fallback_strategy']}")
+            
             self.logger.info(f"📋 Enhanced Rules: Short Selling {self.config.ALLOW_SHORT_SELLING} | Day Trading {self.config.ALLOW_DAY_TRADING}")
             self.logger.info(f"📅 Analysis Date: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
             self.logger.info(f"⏰ Trading Hours: {self.config.TRADING_START_TIME} - {self.config.TRADING_END_TIME}")
@@ -674,9 +691,18 @@ class EnhancedAutomatedTradingSystem:
                 self.logger.warning("⚠️ No stocks in enhanced scan universe - nothing to analyze")
                 return True
             
-            # Step 5: Run trading system analysis with retry
-            self.logger.info("🤖 Step 5: Running enhanced market analysis...")
-            analysis_attempts = 2
+            # Step 5: Run trading system analysis with enhanced strategy override support
+            self.logger.info("🤖 Step 5: Running enhanced market analysis with strategy overrides...")
+            
+            # NEW: Get strategy and stock list overrides from PersonalTradingConfig
+            strategy_override, stock_list_override = self.config.get_automated_strategy_override()
+            
+            if strategy_override:
+                self.logger.info(f"🎯 Strategy Override Active: {strategy_override}")
+            if stock_list_override:
+                self.logger.info(f"📊 Stock List Override Active: {stock_list_override}")
+            
+            analysis_attempts = self.automated_config['max_attempts'] if self.automated_config['enable_retry'] else 1
             results = None
             
             for attempt in range(1, analysis_attempts + 1):
@@ -691,7 +717,11 @@ class EnhancedAutomatedTradingSystem:
                         StockLists.BOLLINGER_MEAN_REVERSION = scan_universe
                         StockLists.GAP_TRADING = scan_universe
                         
-                        results = self.trading_system.run_daily_analysis()
+                        # NEW: Pass strategy and stock list overrides to run_daily_analysis
+                        results = self.trading_system.run_daily_analysis(
+                            strategy_override=strategy_override,
+                            stock_list_override=stock_list_override
+                        )
                         
                     finally:
                         StockLists.BOLLINGER_MEAN_REVERSION = original_bb_list
@@ -704,6 +734,11 @@ class EnhancedAutomatedTradingSystem:
                     if attempt < analysis_attempts:
                         import time
                         time.sleep(30)  # Wait 30 seconds before retry
+                        
+                        # Try fallback strategy if enabled and not on last attempt
+                        if self.automated_config['enable_retry'] and attempt == 1:
+                            self.logger.info(f"🔄 Trying fallback strategy: {self.automated_config['fallback_strategy']}")
+                            strategy_override = self.automated_config['fallback_strategy']
                     else:
                         self.logger.error("❌ CRITICAL: Enhanced market analysis failed after all retries")
                         return False
@@ -794,6 +829,11 @@ class EnhancedAutomatedTradingSystem:
             self.logger.info("="*80)
             self.logger.info(f"📊 Enhanced Execution Summary:")
             self.logger.info(f"   ⏱️ Duration: {duration.total_seconds():.1f} seconds")
+            self.logger.info(f"   🤖 Strategy Mode: {self.automated_config['mode']}")
+            if strategy_override:
+                self.logger.info(f"   🎯 Strategy Used: {strategy_override} (overridden)")
+            else:
+                self.logger.info(f"   🎯 Strategy Used: {results['strategy_used']} (auto-selected)")
             self.logger.info(f"   🏦 Trading Accounts: {len(self.trading_accounts)}")
             self.logger.info(f"   📈 Signals Analyzed: {len(all_signals)}")
             self.logger.info(f"   💰 Trades Executed: {executed_trades}")
@@ -837,7 +877,7 @@ def setup_credentials():
     return setup_credentials_interactive()
 
 def main():
-    """Main entry point for enhanced automated system with modular components"""
+    """Main entry point for enhanced automated system with strategy override support"""
     try:
         system = EnhancedAutomatedTradingSystem()
         success = system.run_enhanced_automated_analysis()
