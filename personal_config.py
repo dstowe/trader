@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 from typing import List, Dict, Tuple, Any
 from trading_system.config.settings import TradingConfig
+from trading_system.config.stock_lists import StockLists
 
 class PersonalTradingConfig(TradingConfig):
     # =================================================================
@@ -16,7 +17,7 @@ class PersonalTradingConfig(TradingConfig):
     # =================================================================
     
     # Strategy Selection Mode for Automated System
-    AUTOMATED_STRATEGY_MODE = 'FORCE_STRATEGY'  # Options: 'AUTO', 'FORCE_STRATEGY', 'FORCE_STOCK_LIST', 'CUSTOM'
+    AUTOMATED_STRATEGY_MODE = 'AUTO'  # Options: 'AUTO', 'FORCE_STRATEGY', 'FORCE_STOCK_LIST', 'CUSTOM'
     
     # Strategy Override Settings
     FORCED_STRATEGY = 'GapTrading'  # Used when AUTOMATED_STRATEGY_MODE = 'FORCE_STRATEGY'
@@ -82,7 +83,7 @@ class PersonalTradingConfig(TradingConfig):
     PREFER_DIVIDEND_STOCKS = True      # Prefer dividend paying stocks
     
     # Time Preferences
-    TRADING_START_TIME = "00:45"  # Wait 15 min after market open
+    TRADING_START_TIME = "00:00"  # Wait 15 min after market open
     TRADING_END_TIME = "23:30"    # Stop 30 min before close
     
     # Notification Preferences
@@ -134,97 +135,6 @@ class PersonalTradingConfig(TradingConfig):
             'International',              # Sixth - international outperformance
             'PolicyMomentum',             # Seventh - Fed/policy volatility plays
             'MicrostructureBreakout'      # Eighth - precise breakout patterns
-        ]
-        
-        # Expanded Stock Universes for All Strategies
-        
-        # International ETFs (for International Strategy)
-        self.INTERNATIONAL_ETFS = [
-            # Broad International
-            'VEA', 'EFA', 'VXUS', 'IEFA',
-            # Currency Hedged
-            'HEFA', 'HEDJ',
-            # Regional
-            'VGK', 'EWJ', 'EEMA', 'VWO',
-            # Specific Countries
-            'EWG', 'EWU', 'EWY', 'INDA'
-        ]
-        
-        # Sector ETFs (for Sector Rotation Strategy)
-        self.SECTOR_ETFS = [
-            'XLK',   # Technology
-            'XLF',   # Financials
-            'XLE',   # Energy
-            'XLV',   # Healthcare
-            'XLI',   # Industrials
-            'XLP',   # Consumer Staples
-            'XLU',   # Utilities
-            'XLY',   # Consumer Discretionary
-            'XLB',   # Materials
-            'XLRE',  # Real Estate
-            'XLC'    # Communication Services
-        ]
-        
-        # REIT Universe (for Value-Rate Strategy)
-        self.REIT_UNIVERSE = [
-            # Industrial/Logistics REITs
-            'PLD', 'EXR',
-            # Healthcare REITs
-            'WELL', 'VTR',
-            # Retail REITs
-            'FRT', 'REG', 'SPG',
-            # Infrastructure REITs
-            'CCI', 'AMT', 'EQIX', 'DLR',
-            # Office REITs
-            'BXP', 'VNO',
-            # Residential REITs
-            'EQR', 'AVB', 'MAA',
-            # REIT ETFs
-            'XLRE', 'IYR', 'SCHH'
-        ]
-        
-        # Financial Universe (for Value-Rate Strategy)
-        self.FINANCIAL_UNIVERSE = [
-            # Large Banks
-            'JPM', 'BAC', 'WFC', 'C',
-            # Regional Banks
-            'USB', 'TFC', 'PNC',
-            # Investment Banks
-            'GS', 'MS',
-            # Insurance
-            'BRK-B', 'AIG',
-            # Financial ETFs
-            'XLF', 'KBE'
-        ]
-        
-        # Policy-Sensitive Stocks (for Policy Momentum Strategy)
-        self.POLICY_SENSITIVE_STOCKS = [
-            # Rate-sensitive financials
-            'JPM', 'BAC', 'USB', 'XLF',
-            # Growth stocks (policy sensitive)
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA',
-            # Market-sensitive ETFs
-            'SPY', 'QQQ', 'IWM'
-        ]
-        
-        # High-Volume Stocks for Microstructure Breakouts
-        self.MICROSTRUCTURE_UNIVERSE = [
-            # Major ETFs (tight spreads)
-            'SPY', 'QQQ', 'IWM', 'XLF', 'XLE', 'XLV', 'XLI', 'XLU',
-            # Large Cap Tech (tight spreads)
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META',
-            # High volume names
-            'AMD', 'INTC', 'NFLX', 'CRM', 'ORCL'
-        ]
-        
-        # Watchlist (Personal favorites to always include)
-        self.PERSONAL_WATCHLIST = [
-            # Blue chip favorites
-            'AAPL', 'MSFT', 'JNJ', 'PG', 'KO',
-            # Value plays
-            'USB', 'TGT', 'CVS', 'XOM', 'CVX',
-            # ETFs
-            'SPY', 'QQQ', 'VTV', 'SCHD'
         ]
 
     # =================================================================
@@ -531,12 +441,8 @@ class PersonalTradingConfig(TradingConfig):
         Returns:
             List of symbols to scan across all strategies
         """
-        # This would need to import StockLists from your trading system
-        # For now, using the personal watchlist and defined universes
-        
-        # Start with watchlist - need to access instance attribute through class
-        config_instance = cls()
-        scan_universe = config_instance.PERSONAL_WATCHLIST.copy()
+        # Start with personal watchlist from StockLists
+        scan_universe = StockLists.PERSONAL_WATCHLIST.copy()
         
         # Add current positions (except buy-and-hold)
         if account_positions:
@@ -554,21 +460,21 @@ class PersonalTradingConfig(TradingConfig):
             
             # 2. Add International ETFs (unless VIX too high)
             if vix_level < cls.VIX_AGGRESSIVE_THRESHOLD:
-                scan_universe.extend(config_instance.INTERNATIONAL_ETFS)
+                scan_universe.extend(StockLists.INTERNATIONAL_ETFS)
             
             # 3. Add Sector ETFs for rotation
-            scan_universe.extend(config_instance.SECTOR_ETFS)
+            scan_universe.extend(StockLists.SECTOR_ETFS)
             
             # 4. Add REITs and Financials (Value-Rate strategy)
-            scan_universe.extend(config_instance.REIT_UNIVERSE)
-            scan_universe.extend(config_instance.FINANCIAL_UNIVERSE)
+            scan_universe.extend(StockLists.REIT_UNIVERSE)
+            scan_universe.extend(StockLists.FINANCIAL_UNIVERSE)
             
             # 5. Add Policy-sensitive stocks (if VIX moderate)
             if vix_level < cls.VIX_CONSERVATIVE_THRESHOLD:
-                scan_universe.extend(config_instance.POLICY_SENSITIVE_STOCKS)
+                scan_universe.extend(StockLists.POLICY_SENSITIVE_STOCKS)
             
             # 6. Add Microstructure universe (high-volume stocks)
-            scan_universe.extend(config_instance.MICROSTRUCTURE_UNIVERSE)
+            scan_universe.extend(StockLists.MICROSTRUCTURE_UNIVERSE)
                     
         else:
             print(f"⚠️  Limited funds: ${settled_funds:.2f} < ${cls.MIN_FRACTIONAL_ORDER:.2f} minimum")
@@ -822,7 +728,7 @@ def validate_personal_config():
     print(f"Take Profit: {config.PERSONAL_TAKE_PROFIT:.1%}")
     print(f"Min Confidence: {config.MIN_SIGNAL_CONFIDENCE:.1%}")
     print(f"Trading Hours: {config.TRADING_START_TIME} - {config.TRADING_END_TIME}")
-    print(f"Watchlist: {len(config.PERSONAL_WATCHLIST)} stocks")
+    print(f"Watchlist: {len(StockLists.PERSONAL_WATCHLIST)} stocks")
     
     print("\n🤖 AUTOMATED SYSTEM CONFIGURATION")
     print("=" * 50)
@@ -910,6 +816,15 @@ def validate_personal_config():
     ]
     for stock_list in stock_lists:
         print(f"  • {stock_list}")
+    
+    print(f"\n📈 STOCK UNIVERSE SIZES FROM STOCKLISTS:")
+    print(f"  • Personal Watchlist: {len(StockLists.PERSONAL_WATCHLIST)} stocks")
+    print(f"  • International ETFs: {len(StockLists.INTERNATIONAL_ETFS)} ETFs")
+    print(f"  • Sector ETFs: {len(StockLists.SECTOR_ETFS)} ETFs")
+    print(f"  • REIT Universe: {len(StockLists.REIT_UNIVERSE)} REITs")
+    print(f"  • Financial Universe: {len(StockLists.FINANCIAL_UNIVERSE)} financials")
+    print(f"  • Policy Sensitive: {len(StockLists.POLICY_SENSITIVE_STOCKS)} stocks")
+    print(f"  • Microstructure: {len(StockLists.MICROSTRUCTURE_UNIVERSE)} stocks")
 
 if __name__ == "__main__":
     validate_personal_config()

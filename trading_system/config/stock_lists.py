@@ -1,5 +1,4 @@
 # config/stock_lists.py
-# config/stock_lists.py
 class StockLists:
     """Stock lists optimized for 2025 market conditions with enhanced strategies"""
     
@@ -132,7 +131,100 @@ class StockLists:
     ]
     
     # ========================================================================
-    # NEW STRATEGY STOCK LISTS
+    # PERSONAL TRADING CONFIG STOCK LISTS (MOVED FROM personal_config.py)
+    # ========================================================================
+    
+    # International ETFs (for International Strategy)
+    INTERNATIONAL_ETFS = [
+        # Broad International
+        'VEA', 'EFA', 'VXUS', 'IEFA',
+        # Currency Hedged
+        'HEFA', 'HEDJ',
+        # Regional
+        'VGK', 'EWJ', 'EEMA', 'VWO',
+        # Specific Countries
+        'EWG', 'EWU', 'EWY', 'INDA'
+    ]
+    
+    # Sector ETFs (for Sector Rotation Strategy)
+    SECTOR_ETFS = [
+        'XLK',   # Technology
+        'XLF',   # Financials
+        'XLE',   # Energy
+        'XLV',   # Healthcare
+        'XLI',   # Industrials
+        'XLP',   # Consumer Staples
+        'XLU',   # Utilities
+        'XLY',   # Consumer Discretionary
+        'XLB',   # Materials
+        'XLRE',  # Real Estate
+        'XLC'    # Communication Services
+    ]
+    
+    # REIT Universe (for Value-Rate Strategy)
+    REIT_UNIVERSE = [
+        # Industrial/Logistics REITs
+        'PLD', 'EXR',
+        # Healthcare REITs
+        'WELL', 'VTR',
+        # Retail REITs
+        'FRT', 'REG', 'SPG',
+        # Infrastructure REITs
+        'CCI', 'AMT', 'EQIX', 'DLR',
+        # Office REITs
+        'BXP', 'VNO',
+        # Residential REITs
+        'EQR', 'AVB', 'MAA',
+        # REIT ETFs
+        'XLRE', 'IYR', 'SCHH'
+    ]
+    
+    # Financial Universe (for Value-Rate Strategy)
+    FINANCIAL_UNIVERSE = [
+        # Large Banks
+        'JPM', 'BAC', 'WFC', 'C',
+        # Regional Banks
+        'USB', 'TFC', 'PNC',
+        # Investment Banks
+        'GS', 'MS',
+        # Insurance
+        'BRK-B', 'AIG',
+        # Financial ETFs
+        'XLF', 'KBE'
+    ]
+    
+    # Policy-Sensitive Stocks (for Policy Momentum Strategy)
+    POLICY_SENSITIVE_STOCKS = [
+        # Rate-sensitive financials
+        'JPM', 'BAC', 'USB', 'XLF',
+        # Growth stocks (policy sensitive)
+        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA',
+        # Market-sensitive ETFs
+        'SPY', 'QQQ', 'IWM'
+    ]
+    
+    # High-Volume Stocks for Microstructure Breakouts
+    MICROSTRUCTURE_UNIVERSE = [
+        # Major ETFs (tight spreads)
+        'SPY', 'QQQ', 'IWM', 'XLF', 'XLE', 'XLV', 'XLI', 'XLU',
+        # Large Cap Tech (tight spreads)
+        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META',
+        # High volume names
+        'AMD', 'INTC', 'NFLX', 'CRM', 'ORCL'
+    ]
+    
+    # Personal Watchlist (Blue chip favorites to always include)
+    PERSONAL_WATCHLIST = [
+        # Blue chip favorites
+        'AAPL', 'MSFT', 'JNJ', 'PG', 'KO',
+        # Value plays
+        'USB', 'TGT', 'CVS', 'XOM', 'CVX',
+        # ETFs
+        'SPY', 'QQQ', 'VTV', 'SCHD'
+    ]
+    
+    # ========================================================================
+    # EXISTING STRATEGY STOCK LISTS
     # ========================================================================
     
     # Sector Rotation Strategy - All major sector ETFs
@@ -271,10 +363,6 @@ class StockLists:
         'GLD', 'SLV', 'UUP', 'FXE',  # Gold, Silver, Dollar ETFs
     ]
     
-    # ========================================================================
-    # ENHANCED EXISTING LISTS
-    # ========================================================================
-    
     # Expanded gap trading with new volatility-optimized additions
     GAP_TRADING = [
         # High Volume ETFs
@@ -306,165 +394,6 @@ class StockLists:
         'VEA', 'EFA', 'VGK', 'EWJ', 'VWO',
     ]
     
-    # ========================================================================
-    # STRATEGY ALLOCATION FRAMEWORKS
-    # ========================================================================
-    
-    # Conservative Portfolio (Lower risk, steady income)
-    CONSERVATIVE_STRATEGY_UNIVERSE = [
-        # Core positions (60%)
-        'SPY', 'VTV', 'VEA',  # Broad market exposure
-        
-        # Income focus (25%)
-        'O', 'PLD', 'CCI', 'USB', 'TFC', 'DUK', 'SO',
-        
-        # International (15%)
-        'VEA', 'VGK', 'EWJ',
-    ]
-    
-    # Aggressive Growth Portfolio (Higher risk, growth focused)
-    AGGRESSIVE_STRATEGY_UNIVERSE = [
-        # Growth core (40%)
-        'QQQ', 'NVDA', 'TSLA', 'AMD', 'CRM',
-        
-        # Sector rotation (30%)
-        'XLK', 'XLF', 'XLE', 'XLV', 'XLI',
-        
-        # International growth (15%)
-        'VWO', 'EEMA', 'EWY', 'INDA',
-        
-        # Momentum/Breakout (15%)
-        'SPY', 'QQQ', 'IWM',
-    ]
-    
-    # Balanced Portfolio (Moderate risk, diversified)
-    BALANCED_STRATEGY_UNIVERSE = [
-        # Core holdings (50%)
-        'SPY', 'QQQ', 'VTV', 'VEA',
-        
-        # Value/Income (25%)
-        'USB', 'PLD', 'O', 'XLF', 'XLRE',
-        
-        # Growth/Momentum (15%)
-        'NVDA', 'CRM', 'XLK',
-        
-        # International (10%)
-        'VEA', 'VGK', 'VWO',
-    ]
-    
-    # ========================================================================
-    # UTILITY METHODS AND MAPPINGS
-    # ========================================================================
-    
-    @classmethod
-    def get_stocks_for_strategy(cls, strategy_name: str) -> list:
-        """Return appropriate stock list for given strategy"""
-        
-        strategy_mapping = {
-            'BollingerMeanReversion': cls.BOLLINGER_MEAN_REVERSION,
-            'SectorRotation': cls.SECTOR_ROTATION,
-            'International': cls.INTERNATIONAL_OUTPERFORMANCE,
-            'ValueRate': cls.VALUE_RATE_UNIVERSE,
-            'MicrostructureBreakout': cls.MICROSTRUCTURE_BREAKOUT,
-            'PolicyMomentum': cls.POLICY_MOMENTUM,
-            'GapTrading': cls.GAP_TRADING,
-            'BullishMomentumDip': cls.BULLISH_MOMENTUM_UNIVERSE,  # NEW
-            'Conservative': cls.CONSERVATIVE_STRATEGY_UNIVERSE,
-            'Aggressive': cls.AGGRESSIVE_STRATEGY_UNIVERSE,
-            'Balanced': cls.BALANCED_STRATEGY_UNIVERSE,
-        }
-        
-        return strategy_mapping.get(strategy_name, cls.BOLLINGER_MEAN_REVERSION)
-    
-    @classmethod
-    def get_strategy_info(cls) -> dict:
-        """Return comprehensive information about all available strategies"""
-        
-        return {
-            'BollingerMeanReversion': {
-                'stocks': len(cls.BOLLINGER_MEAN_REVERSION),
-                'description': 'Enhanced value-focused mean reversion with optimal volatility',
-                'market_condition': 'VALUE_ROTATION_2025',
-                'volatility_target': 'ATR 1.0-2.0%'
-            },
-            'SectorRotation': {
-                'stocks': len(cls.SECTOR_ROTATION),
-                'description': 'Volatility-adjusted sector momentum rotation',
-                'market_condition': 'FREQUENT_SECTOR_ROTATION',
-                'volatility_target': 'VIX-scaled position sizing'
-            },
-            'International': {
-                'stocks': len(cls.INTERNATIONAL_OUTPERFORMANCE),
-                'description': 'Capitalize on MSCI EAFE +11.21% outperformance',
-                'market_condition': 'INTERNATIONAL_ROTATION',
-                'volatility_target': 'Currency-adjusted exposure'
-            },
-            'ValueRate': {
-                'stocks': len(cls.VALUE_RATE_UNIVERSE),
-                'description': 'REITs 9% undervalued + financials in rate environment',
-                'market_condition': 'RATE_ENVIRONMENT_VALUE',
-                'volatility_target': 'Rate-sensitive positioning'
-            },
-            'MicrostructureBreakout': {
-                'stocks': len(cls.MICROSTRUCTURE_BREAKOUT),
-                'description': 'Exploit 21-45% tighter spreads for precise entries',
-                'market_condition': 'IMPROVED_LIQUIDITY',
-                'volatility_target': 'Spread-optimized execution'
-            },
-            'PolicyMomentum': {
-                'stocks': len(cls.POLICY_MOMENTUM),
-                'description': 'Fed-driven volatility and policy uncertainty plays',
-                'market_condition': 'POLICY_UNCERTAINTY',
-                'volatility_target': 'Event-driven volatility'
-            }
-        }
-    
-    # ========================================================================
-    # BACKWARD COMPATIBILITY
-    # ========================================================================
-    
-    # Legacy aliases maintained for existing code
-    GAP_TRADING_STOCKS = GAP_TRADING
-    GAP_TRADING_UNIVERSE = BOLLINGER_MEAN_REVERSION + GAP_TRADING
-    
-    # Maintain existing structure
-    DIVIDEND_ARISTOCRATS_VALUE = [
-        'PG', 'KO', 'JNJ', 'XOM', 'CVX', 'CAT', 'MCD', 'TGT', 'LOW',
-        'HD', 'MMM', 'GE', 'IBM', 'VZ', 'T', 'SO', 'D', 'NEE'
-    ]
-    
-    DEEP_VALUE_OPPORTUNITIES = [
-        'CVS', 'TGT', 'INTC', 'F', 'CPB', 'T', 'CHRD', 'X', 'C', 'WFC',
-        'IBM', 'BMY', 'BA', 'MMM', 'XOM'
-    ]
-    
-    ENERGY_VALUE_PLAYS = [
-        'XOM', 'CVX', 'EOG', 'COP', 'SLB', 'EPD', 'KMI', 'ET', 'CHRD', 'XLE'
-    ]
-    
-    FINANCIAL_ROTATION_LEADERS = [
-        'JPM', 'BAC', 'USB', 'TFC', 'PNC', 'WFC', 'BK', 'NTRS', 'GS', 'MS', 'C', 'XLF'
-    ]
-    
-    HEALTHCARE_DEFENSIVE_VALUE = [
-        'JNJ', 'UNH', 'DHR', 'CVS', 'PFE', 'ABBV', 'MRK', 'BMY', 'XLV'
-    ]
-    
-    REIT_INCOME_FOCUS = [
-        'O', 'PLD', 'CCI', 'AMT', 'SPG', 'PSA', 'XLRE'
-    ]
-    
-    # ETF lists
-    ETFS = ['SPY', 'QQQ', 'IWM', 'VTV', 'IWD', 'XLF', 'XLE', 'XLV', 'XLI', 'XLU', 
-            'XLP', 'XLRE', 'VEA', 'EFA', 'VGK', 'EWJ', 'VWO']
-    
-    # Market cap classifications
-    MEGA_CAP = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META']
-    LARGE_CAP = ['JPM', 'BAC', 'XOM', 'CVX', 'JNJ', 'PG', 'UNH', 'DHR', 'CAT', 'NUE']
-    MID_CAP = ['ROKU', 'PTON', 'ZM', 'PLTR', 'SNOW', 'CVS', 'CHRD']
-
-    # Add this to the StockLists class in config/stock_lists.py
-
     # Bullish Momentum Dip Strategy - High-quality momentum stocks
     BULLISH_MOMENTUM_UNIVERSE = [
         # Mega Cap Tech - Classic momentum leaders
@@ -591,3 +520,160 @@ class StockLists:
         'QUAL',  # iShares MSCI USA Quality Factor ETF
         'USMV',  # iShares MSCI USA Min Vol Factor ETF
     ]
+    
+    # ========================================================================
+    # STRATEGY ALLOCATION FRAMEWORKS
+    # ========================================================================
+    
+    # Conservative Portfolio (Lower risk, steady income)
+    CONSERVATIVE_STRATEGY_UNIVERSE = [
+        # Core positions (60%)
+        'SPY', 'VTV', 'VEA',  # Broad market exposure
+        
+        # Income focus (25%)
+        'O', 'PLD', 'CCI', 'USB', 'TFC', 'DUK', 'SO',
+        
+        # International (15%)
+        'VEA', 'VGK', 'EWJ',
+    ]
+    
+    # Aggressive Growth Portfolio (Higher risk, growth focused)
+    AGGRESSIVE_STRATEGY_UNIVERSE = [
+        # Growth core (40%)
+        'QQQ', 'NVDA', 'TSLA', 'AMD', 'CRM',
+        
+        # Sector rotation (30%)
+        'XLK', 'XLF', 'XLE', 'XLV', 'XLI',
+        
+        # International growth (15%)
+        'VWO', 'EEMA', 'EWY', 'INDA',
+        
+        # Momentum/Breakout (15%)
+        'SPY', 'QQQ', 'IWM',
+    ]
+    
+    # Balanced Portfolio (Moderate risk, diversified)
+    BALANCED_STRATEGY_UNIVERSE = [
+        # Core holdings (50%)
+        'SPY', 'QQQ', 'VTV', 'VEA',
+        
+        # Value/Income (25%)
+        'USB', 'PLD', 'O', 'XLF', 'XLRE',
+        
+        # Growth/Momentum (15%)
+        'NVDA', 'CRM', 'XLK',
+        
+        # International (10%)
+        'VEA', 'VGK', 'VWO',
+    ]
+    
+    # ========================================================================
+    # BACKWARD COMPATIBILITY
+    # ========================================================================
+    
+    # Legacy aliases maintained for existing code
+    GAP_TRADING_STOCKS = GAP_TRADING
+    GAP_TRADING_UNIVERSE = BOLLINGER_MEAN_REVERSION + GAP_TRADING
+    
+    # Maintain existing structure
+    DIVIDEND_ARISTOCRATS_VALUE = [
+        'PG', 'KO', 'JNJ', 'XOM', 'CVX', 'CAT', 'MCD', 'TGT', 'LOW',
+        'HD', 'MMM', 'GE', 'IBM', 'VZ', 'T', 'SO', 'D', 'NEE'
+    ]
+    
+    DEEP_VALUE_OPPORTUNITIES = [
+        'CVS', 'TGT', 'INTC', 'F', 'CPB', 'T', 'CHRD', 'X', 'C', 'WFC',
+        'IBM', 'BMY', 'BA', 'MMM', 'XOM'
+    ]
+    
+    ENERGY_VALUE_PLAYS = [
+        'XOM', 'CVX', 'EOG', 'COP', 'SLB', 'EPD', 'KMI', 'ET', 'CHRD', 'XLE'
+    ]
+    
+    FINANCIAL_ROTATION_LEADERS = [
+        'JPM', 'BAC', 'USB', 'TFC', 'PNC', 'WFC', 'BK', 'NTRS', 'GS', 'MS', 'C', 'XLF'
+    ]
+    
+    HEALTHCARE_DEFENSIVE_VALUE = [
+        'JNJ', 'UNH', 'DHR', 'CVS', 'PFE', 'ABBV', 'MRK', 'BMY', 'XLV'
+    ]
+    
+    REIT_INCOME_FOCUS = [
+        'O', 'PLD', 'CCI', 'AMT', 'SPG', 'PSA', 'XLRE'
+    ]
+    
+    # ETF lists
+    ETFS = ['SPY', 'QQQ', 'IWM', 'VTV', 'IWD', 'XLF', 'XLE', 'XLV', 'XLI', 'XLU', 
+            'XLP', 'XLRE', 'VEA', 'EFA', 'VGK', 'EWJ', 'VWO']
+    
+    # Market cap classifications
+    MEGA_CAP = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META']
+    LARGE_CAP = ['JPM', 'BAC', 'XOM', 'CVX', 'JNJ', 'PG', 'UNH', 'DHR', 'CAT', 'NUE']
+    MID_CAP = ['ROKU', 'PTON', 'ZM', 'PLTR', 'SNOW', 'CVS', 'CHRD']
+
+    # ========================================================================
+    # UTILITY METHODS AND MAPPINGS
+    # ========================================================================
+    
+    @classmethod
+    def get_stocks_for_strategy(cls, strategy_name: str) -> list:
+        """Return appropriate stock list for given strategy"""
+        
+        strategy_mapping = {
+            'BollingerMeanReversion': cls.BOLLINGER_MEAN_REVERSION,
+            'SectorRotation': cls.SECTOR_ROTATION,
+            'International': cls.INTERNATIONAL_OUTPERFORMANCE,
+            'ValueRate': cls.VALUE_RATE_UNIVERSE,
+            'MicrostructureBreakout': cls.MICROSTRUCTURE_BREAKOUT,
+            'PolicyMomentum': cls.POLICY_MOMENTUM,
+            'GapTrading': cls.GAP_TRADING,
+            'BullishMomentumDip': cls.BULLISH_MOMENTUM_UNIVERSE,
+            'Conservative': cls.CONSERVATIVE_STRATEGY_UNIVERSE,
+            'Aggressive': cls.AGGRESSIVE_STRATEGY_UNIVERSE,
+            'Balanced': cls.BALANCED_STRATEGY_UNIVERSE,
+        }
+        
+        return strategy_mapping.get(strategy_name, cls.BOLLINGER_MEAN_REVERSION)
+    
+    @classmethod
+    def get_strategy_info(cls) -> dict:
+        """Return comprehensive information about all available strategies"""
+        
+        return {
+            'BollingerMeanReversion': {
+                'stocks': len(cls.BOLLINGER_MEAN_REVERSION),
+                'description': 'Enhanced value-focused mean reversion with optimal volatility',
+                'market_condition': 'VALUE_ROTATION_2025',
+                'volatility_target': 'ATR 1.0-2.0%'
+            },
+            'SectorRotation': {
+                'stocks': len(cls.SECTOR_ROTATION),
+                'description': 'Volatility-adjusted sector momentum rotation',
+                'market_condition': 'FREQUENT_SECTOR_ROTATION',
+                'volatility_target': 'VIX-scaled position sizing'
+            },
+            'International': {
+                'stocks': len(cls.INTERNATIONAL_OUTPERFORMANCE),
+                'description': 'Capitalize on MSCI EAFE +11.21% outperformance',
+                'market_condition': 'INTERNATIONAL_ROTATION',
+                'volatility_target': 'Currency-adjusted exposure'
+            },
+            'ValueRate': {
+                'stocks': len(cls.VALUE_RATE_UNIVERSE),
+                'description': 'REITs 9% undervalued + financials in rate environment',
+                'market_condition': 'RATE_ENVIRONMENT_VALUE',
+                'volatility_target': 'Rate-sensitive positioning'
+            },
+            'MicrostructureBreakout': {
+                'stocks': len(cls.MICROSTRUCTURE_BREAKOUT),
+                'description': 'Exploit 21-45% tighter spreads for precise entries',
+                'market_condition': 'IMPROVED_LIQUIDITY',
+                'volatility_target': 'Spread-optimized execution'
+            },
+            'PolicyMomentum': {
+                'stocks': len(cls.POLICY_MOMENTUM),
+                'description': 'Fed-driven volatility and policy uncertainty plays',
+                'market_condition': 'POLICY_UNCERTAINTY',
+                'volatility_target': 'Event-driven volatility'
+            }
+        }
