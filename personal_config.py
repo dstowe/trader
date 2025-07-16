@@ -587,11 +587,12 @@ class PersonalTradingConfig:
 
         return False
 
+
     @classmethod
     def get_position_size(cls, signal_price, account_value, settled_funds):
         """Calculate optimal position size with safety buffer for fractional orders"""
         # Use the actual account value (netLiquidation) for percentage calculations
-        max_by_percentage = account_value * cls.MAX_POSITION_VALUE_PERCENT  # Use authoritative parameter
+        max_by_percentage = account_value * cls.MAX_POSITION_VALUE_PERCENT
         max_by_funds = settled_funds
 
         max_position_value = min(max_by_percentage, max_by_funds)
@@ -641,16 +642,49 @@ class PersonalTradingConfig:
                 'reason': f'Buffered amount ${buffered_amount:.2f} below minimum ${cls.MIN_FRACTIONAL_ORDER:.2f}'
             }
 
-        # Use buffered dollar-amount ordering for fractional shares
-        return {
-            'type': 'dollars',
-            'amount': round(buffered_amount, 2),  # Round to nearest cent
-            'is_fractional': True,
-            'buffer_applied': True,
-            'original_amount': round(max_position_value, 2),
-            'buffer_percentage': cls.FRACTIONAL_FUND_BUFFER,
-            'estimated_shares': round(buffered_amount / signal_price, 4)
-        }
+        # CRITICAL: Ensure fractional shares will be less than 1
+        estimated_fractional_shares = buffered_amount / signal_price
+        
+        # If the fractional shares would be >= 1, we need to reduce the amount
+        if estimated_fractional_shares >= 1.0:
+            # Calculate the maximum dollar amount that gives us <1 share
+            max_dollar_for_fractional = signal_price * 0.99  # 99% of one share
+            
+            # Use the smaller of our buffered amount or the max for fractional
+            final_amount = min(buffered_amount, max_dollar_for_fractional)
+            
+            # Double-check this is still above minimum
+            if final_amount < cls.MIN_FRACTIONAL_ORDER:
+                return {
+                    'type': 'none',
+                    'amount': 0,
+                    'is_fractional': False,
+                    'reason': f'Fractional amount ${final_amount:.2f} below minimum ${cls.MIN_FRACTIONAL_ORDER:.2f} after adjustment'
+                }
+            
+            final_fractional_shares = final_amount / signal_price
+            
+            return {
+                'type': 'dollars',
+                'amount': round(final_amount, 2),
+                'is_fractional': True,
+                'buffer_applied': True,
+                'original_amount': round(max_position_value, 2),
+                'buffer_percentage': cls.FRACTIONAL_FUND_BUFFER,
+                'estimated_shares': round(final_fractional_shares, 6),
+                'fractional_adjustment': f'Reduced from ${buffered_amount:.2f} to ensure <1 share'
+            }
+        else:
+            # Use buffered dollar-amount ordering for fractional shares
+            return {
+                'type': 'dollars',
+                'amount': round(buffered_amount, 2),  # Round to nearest cent
+                'is_fractional': True,
+                'buffer_applied': True,
+                'original_amount': round(max_position_value, 2),
+                'buffer_percentage': cls.FRACTIONAL_FUND_BUFFER,
+                'estimated_shares': round(estimated_fractional_shares, 6)
+            }
 
     @classmethod
     def get_fractional_capability_info(cls, account_value, settled_funds):

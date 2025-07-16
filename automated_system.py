@@ -368,7 +368,7 @@ class EnhancedAutomatedTradingSystem:
         
         return filtered_signals
     
-    def execute_trade_automatically_on_account(self, account: AccountInfo, signal) -> bool: # Changed signal type hint to reflect object
+    def execute_trade_automatically_on_account(self, account: AccountInfo, signal) -> bool:
         """Execute trade automatically on specific account with enhanced retry logic"""
         max_attempts = 3
         base_delay = 10
@@ -395,7 +395,7 @@ class EnhancedAutomatedTradingSystem:
                     else:
                         # Fallback: calculate on-demand using centralized method
                         strategy_name = signal.strategy
-                        signal_metadata = signal.metadata # Assuming metadata is directly accessible
+                        signal_metadata = signal.metadata
                         
                         position_info = self.config.get_position_size_with_strategy_adjustments(
                             price, account.net_liquidation, account.settled_funds,
@@ -407,12 +407,22 @@ class EnhancedAutomatedTradingSystem:
                         return False
                     
                     if position_info['type'] == 'dollars':
-                        # Fractional share order
-                        quantity = position_info['amount']  # Dollar amount for fractional
-                        self.logger.info(f"Using fractional order: ${quantity} worth of {symbol}")
+                        # FIXED: Convert dollar amount to fractional shares for Webull API
+                        dollar_amount = position_info['amount']
+                        fractional_shares = dollar_amount / price
+                        
+                        # Ensure fractional shares is less than 1 (Webull requirement)
+                        if fractional_shares >= 1.0:
+                            self.logger.warning(f"❌ Fractional shares calculation error: {fractional_shares:.4f} >= 1.0")
+                            self.logger.warning(f"   Dollar amount: ${dollar_amount}, Price: ${price}")
+                            return False
+                        
+                        quantity = round(fractional_shares, 6)  # Round to 6 decimal places
+                        self.logger.info(f"Using fractional order: {quantity:.6f} shares (${dollar_amount:.2f} worth) of {symbol}")
+                        
                         if 'strategy_adjustment' in position_info:
                             adj = position_info['strategy_adjustment']
-                            self.logger.info(f"Applied {adj['reason']}: {adj['factor']:.2f}x (${adj['original_amount']:.2f} → ${quantity})")
+                            self.logger.info(f"Applied {adj['reason']}: {adj['factor']:.2f}x (${adj['original_amount']:.2f} → ${dollar_amount})")
                     else:
                         # Whole share order
                         quantity = position_info['amount']
@@ -436,7 +446,12 @@ class EnhancedAutomatedTradingSystem:
                 
                 # Execute the order using PersonalTradingConfig order type (AUTHORITATIVE)
                 order_type = self.config.FRACTIONAL_ORDER_TYPE
-                self.logger.info(f"Placing {signal_type} order: {quantity} {'dollars' if signal_type == 'BUY' and position_info['type'] == 'dollars' else 'shares'} of {symbol} on {account.account_type} ({order_type})")
+                
+                # FIXED: Log the correct order details
+                if signal_type == 'BUY' and position_info['type'] == 'dollars':
+                    self.logger.info(f"Placing {signal_type} order: {quantity:.6f} fractional shares of {symbol} on {account.account_type} ({order_type})")
+                else:
+                    self.logger.info(f"Placing {signal_type} order: {quantity} shares of {symbol} on {account.account_type} ({order_type})")
                 
                 order_result = self.wb.place_order(
                     stock=symbol,
@@ -444,11 +459,11 @@ class EnhancedAutomatedTradingSystem:
                     action=signal_type,
                     orderType=order_type,
                     enforce='DAY',
-                    quant=quantity,
+                    quant=quantity,  # Now using fractional shares, not dollars
                     outsideRegularTradingHour=False
                 )
                 
-                # Check order result
+                # Check order result (rest of the method remains the same)
                 if order_result is None:
                     raise Exception("No order result received")
                 
