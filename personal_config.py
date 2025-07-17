@@ -59,7 +59,7 @@ class PersonalTradingConfig:
     # Fractional Order Safety Settings
     FRACTIONAL_FUND_BUFFER = 0.9       # Use only 90% of available funds for fractional orders
     MIN_FRACTIONAL_ORDER = 5.0         # Minimum $5 for fractional orders to avoid API issues
-    FRACTIONAL_ORDER_TYPE = 'LMT'      # Use limit orders for better fractional execution
+    FRACTIONAL_ORDER_TYPE = 'MKT'      # Must use market orders for fractinal shares
 
     # Signal Filtering
     MIN_SIGNAL_CONFIDENCE = 0.6        # 60% minimum confidence for trades

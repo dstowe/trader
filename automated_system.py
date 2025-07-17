@@ -369,69 +369,98 @@ class EnhancedAutomatedTradingSystem:
         return filtered_signals
     
     def execute_trade_automatically_on_account(self, account: AccountInfo, signal) -> bool:
-        """Execute trade automatically on specific account with enhanced retry logic"""
+        """Execute trade automatically with comprehensive fractional share support"""
         max_attempts = 3
         base_delay = 10
         
-        # Access attributes using dot notation
         symbol = signal.symbol
         signal_type = signal.signal_type
         price = signal.price
         
         self.logger.info(f"💰 EXECUTING: {signal_type} {symbol} @ ${price:.2f} on {account.account_type}")
         
+        # SESSION CHECK: Verify session before trading
+        try:
+            test_account = self.wb.get_account_id()
+            if not test_account:
+                raise Exception("Session test failed")
+        except Exception as e:
+            self.logger.warning(f"🔄 Session appears expired ({e}), refreshing...")
+            if hasattr(self, 'login_manager') and self.login_manager.login_automatically():
+                self.logger.info("✅ Session refreshed successfully")
+                if hasattr(self, 'session_manager'):
+                    self.session_manager.save_session(self.wb)
+            else:
+                self.logger.error("❌ Failed to refresh session")
+                return False
+        
         for attempt in range(1, max_attempts + 1):
             try:
-                # Switch to this account
+                # Switch to account
                 if not self.account_manager.switch_to_account(account):
                     self.logger.error(f"❌ Failed to switch to {account.account_type}")
                     return False
                 
-                # Calculate position sizing using CENTRALIZED method (UPDATED)
+                # Calculate position sizing
                 if signal_type == 'BUY':
-                    # Use pre-calculated position info from filtering stage
                     if hasattr(signal, 'calculated_position_info'):
                         position_info = signal.calculated_position_info
                     else:
-                        # Fallback: calculate on-demand using centralized method
                         strategy_name = signal.strategy
                         signal_metadata = signal.metadata
-                        
                         position_info = self.config.get_position_size_with_strategy_adjustments(
                             price, account.net_liquidation, account.settled_funds,
                             strategy_name=strategy_name, signal_metadata=signal_metadata
                         )
                     
                     if position_info['type'] == 'none':
-                        self.logger.warning(f"Skipping {symbol} on {account.account_type} - {position_info.get('reason', 'Position sizing failed')}")
+                        self.logger.warning(f"Skipping {symbol} - {position_info.get('reason', 'Position sizing failed')}")
                         return False
                     
+                    # ENHANCED FRACTIONAL HANDLING
                     if position_info['type'] == 'dollars':
-                        # FIXED: Convert dollar amount to fractional shares for Webull API
                         dollar_amount = position_info['amount']
                         fractional_shares = dollar_amount / price
                         
-                        # Ensure fractional shares is less than 1 (Webull requirement)
-                        if fractional_shares >= 1.0:
-                            self.logger.warning(f"❌ Fractional shares calculation error: {fractional_shares:.4f} >= 1.0")
-                            self.logger.warning(f"   Dollar amount: ${dollar_amount}, Price: ${price}")
-                            return False
-                        
-                        quantity = round(fractional_shares, 6)  # Round to 6 decimal places
-                        self.logger.info(f"Using fractional order: {quantity:.6f} shares (${dollar_amount:.2f} worth) of {symbol}")
+                        # Check if fractional shares are supported for this stock
+                        if not self._supports_fractional_shares(symbol):
+                            self.logger.warning(f"⚠️ {symbol} doesn't support fractional shares, converting to whole shares")
+                            # Convert to whole shares
+                            whole_shares = int(fractional_shares)
+                            if whole_shares >= 1:
+                                quantity = float(whole_shares)
+                                order_mode = 'whole_shares'
+                                self.logger.info(f"Using whole shares: {whole_shares} shares of {symbol}")
+                            else:
+                                self.logger.warning(f"❌ Cannot afford even 1 whole share of {symbol} (${price:.2f})")
+                                return False
+                        else:
+                            # Use fractional shares
+                            if fractional_shares >= 1.0:
+                                self.logger.warning(f"❌ Fractional shares >= 1.0: {fractional_shares:.6f}")
+                                return False
+                            
+                            # Round to 5 decimal places (common for fractional shares)
+                            quantity = round(fractional_shares, 5)
+                            order_mode = 'fractional_shares'
+                            self.logger.info(f"Using fractional order: {quantity:.5f} shares (${dollar_amount:.2f} worth) of {symbol}")
+                            
+                            # Validate minimum fractional amount
+                            if quantity < 0.00001:
+                                self.logger.warning(f"❌ Fractional quantity too small: {quantity:.6f}")
+                                return False
                         
                         if 'strategy_adjustment' in position_info:
                             adj = position_info['strategy_adjustment']
-                            self.logger.info(f"Applied {adj['reason']}: {adj['factor']:.2f}x (${adj['original_amount']:.2f} → ${dollar_amount})")
+                            self.logger.info(f"Applied {adj['reason']}: {adj['factor']:.2f}x")
+                            
                     else:
                         # Whole share order
                         quantity = position_info['amount']
-                        if 'strategy_adjustment' in position_info:
-                            adj = position_info['strategy_adjustment']
-                            self.logger.info(f"Applied {adj['reason']}: {adj['factor']:.2f}x ({adj['original_amount']:.0f} → {quantity:.0f} shares)")
-                    
+                        order_mode = 'whole_shares'
+                        
                 elif signal_type == 'SELL':
-                    # Find position to sell (unchanged)
+                    # Find position to sell
                     position = None
                     for pos in account.positions:
                         if pos['symbol'] == symbol:
@@ -439,52 +468,42 @@ class EnhancedAutomatedTradingSystem:
                             break
                     
                     if not position:
-                        self.logger.warning(f"No position found for {symbol} on {account.account_type} - skipping sell")
+                        self.logger.warning(f"No position found for {symbol} - skipping sell")
                         return False
                     
                     quantity = position['quantity']
+                    order_mode = 'fractional_shares' if quantity != int(quantity) else 'whole_shares'
                 
-                # Execute the order using PersonalTradingConfig order type (AUTHORITATIVE)
+                # Execute order with appropriate parameters
                 order_type = self.config.FRACTIONAL_ORDER_TYPE
                 
-                # FIXED: Log the correct order details
-                if signal_type == 'BUY' and position_info['type'] == 'dollars':
-                    self.logger.info(f"Placing {signal_type} order: {quantity:.6f} fractional shares of {symbol} on {account.account_type} ({order_type})")
+                # ENHANCED ORDER PLACEMENT
+                if order_mode == 'fractional_shares' and signal_type == 'BUY':
+                    self.logger.info(f"Placing {signal_type} fractional order: {quantity:.5f} shares of {symbol} ({order_type})")
+                    
+                    # For fractional shares, try different approaches
+                    order_result = self._place_fractional_order(
+                        symbol=symbol,
+                        price=price,
+                        action=signal_type,
+                        quantity=quantity,
+                        order_type=order_type
+                    )
                 else:
-                    self.logger.info(f"Placing {signal_type} order: {quantity} shares of {symbol} on {account.account_type} ({order_type})")
+                    self.logger.info(f"Placing {signal_type} whole share order: {quantity} shares of {symbol} ({order_type})")
+                    
+                    order_result = self.wb.place_order(
+                        stock=symbol,
+                        price=price,
+                        action=signal_type,
+                        orderType=order_type,
+                        enforce='DAY',
+                        quant=int(quantity) if order_mode == 'whole_shares' else quantity,
+                        outsideRegularTradingHour=False
+                    )
                 
-                order_result = self.wb.place_order(
-                    stock=symbol,
-                    price=price,
-                    action=signal_type,
-                    orderType=order_type,
-                    enforce='DAY',
-                    quant=quantity,  # Now using fractional shares, not dollars
-                    outsideRegularTradingHour=False
-                )
-                
-                # Check order result (rest of the method remains the same)
-                if order_result is None:
-                    raise Exception("No order result received")
-                
-                # Parse different response formats
-                success = False
-                order_id = None
-                error_message = None
-                
-                if isinstance(order_result, dict):
-                    # Check for success indicators
-                    if order_result.get('success') == True:
-                        success = True
-                        order_id = order_result.get('orderId', 'Unknown')
-                    elif 'data' in order_result and 'orderId' in order_result['data']:
-                        success = True
-                        order_id = order_result['data']['orderId']
-                    elif 'orderId' in order_result:
-                        success = True
-                        order_id = order_result['orderId']
-                    else:
-                        error_message = order_result.get('msg', f'Order failed: {order_result}')
+                # Check order result
+                success, order_id, error_message = self._parse_order_result(order_result)
                 
                 if success:
                     self.logger.info(f"✅ Order executed successfully on {account.account_type} (attempt {attempt})")
@@ -493,36 +512,151 @@ class EnhancedAutomatedTradingSystem:
                     self.logger.info(f"   Action: {signal_type}")
                     self.logger.info(f"   Quantity: {quantity}")
                     self.logger.info(f"   Price: ${price:.2f}")
-                    self.logger.info(f"   Order Type: {order_type}")
+                    self.logger.info(f"   Mode: {order_mode}")
                     
-                    # Log trade details
                     self.log_trade_execution(signal, quantity, order_result, account)
                     return True
                 else:
-                    # Order failed - check if retryable
+                    # Handle specific fractional share errors
+                    if self._is_fractional_share_error(error_message):
+                        self.logger.warning(f"🔄 Fractional share error, trying whole shares instead")
+                        # Retry with whole shares if possible
+                        if order_mode == 'fractional_shares' and signal_type == 'BUY':
+                            whole_shares = int(quantity * price / position_info['amount'])
+                            if whole_shares >= 1:
+                                self.logger.info(f"Converting to {whole_shares} whole shares")
+                                order_result = self.wb.place_order(
+                                    stock=symbol,
+                                    price=price,
+                                    action=signal_type,
+                                    orderType=order_type,
+                                    enforce='DAY',
+                                    quant=whole_shares,
+                                    outsideRegularTradingHour=False
+                                )
+                                success, order_id, error_message = self._parse_order_result(order_result)
+                                if success:
+                                    self.logger.info(f"✅ Whole share order successful: {whole_shares} shares")
+                                    self.log_trade_execution(signal, whole_shares, order_result, account)
+                                    return True
+                    
+                    # Check if retryable
                     if not self._is_retryable_trade_error(order_result, error_message):
-                        self.logger.error(f"❌ Non-retryable trade error on {account.account_type}: {error_message}")
+                        self.logger.error(f"❌ Non-retryable error: {error_message}")
                         return False
                     
-                    self.logger.warning(f"❌ Trade attempt {attempt} failed on {account.account_type}: {error_message}")
+                    self.logger.warning(f"❌ Trade attempt {attempt} failed: {error_message}")
                     
             except Exception as e:
-                self.logger.warning(f"❌ Trade execution attempt {attempt} exception on {account.account_type}: {e}")
-                
-                # Check if exception is retryable
+                self.logger.warning(f"❌ Trade execution exception (attempt {attempt}): {e}")
                 if not self._is_retryable_exception(e):
-                    self.logger.error(f"❌ Non-retryable trade exception on {account.account_type}: {e}")
                     return False
             
-            # Wait before retry (except on last attempt)
+            # Wait before retry
             if attempt < max_attempts:
-                delay = base_delay * attempt  # 10, 20 seconds
-                self.logger.info(f"⏳ Waiting {delay} seconds before trade retry...")
+                delay = base_delay * attempt
+                self.logger.info(f"⏳ Waiting {delay} seconds before retry...")
                 import time
                 time.sleep(delay)
         
-        self.logger.error(f"❌ Failed to execute trade on {account.account_type} after {max_attempts} attempts")
+        self.logger.error(f"❌ Failed to execute trade after {max_attempts} attempts")
         return False
+
+    def _supports_fractional_shares(self, symbol: str) -> bool:
+        """Check if stock supports fractional shares"""
+        # Stocks that typically DON'T support fractional shares
+        no_fractional_stocks = {
+            'BRK-A', 'BRK-B',  # Berkshire Hathaway (too expensive/special rules)
+            # Add others as discovered
+        }
+        
+        # For now, assume most stocks support fractional shares except known exceptions
+        if symbol in no_fractional_stocks:
+            return False
+        
+        # Could also check price - very expensive stocks often don't support fractional
+        # if price > 1000:  # Example threshold
+        #     return False
+        
+        return True
+
+    def _place_fractional_order(self, symbol: str, price: float, action: str, 
+                            quantity: float, order_type: str):
+        """Place fractional order with multiple fallback approaches"""
+        
+        # Method 1: Standard fractional order
+        try:
+            self.logger.debug(f"🔍 Trying standard fractional order: {quantity:.5f} shares")
+            return self.wb.place_order(
+                stock=symbol,
+                price=price,
+                action=action,
+                orderType=order_type,
+                enforce='DAY',
+                quant=quantity,
+                outsideRegularTradingHour=False
+            )
+        except Exception as e:
+            self.logger.debug(f"Standard fractional order failed: {e}")
+        
+        # Method 2: Round to different precision
+        try:
+            rounded_qty = round(quantity, 4)  # Try 4 decimal places
+            self.logger.debug(f"🔍 Trying rounded fractional order: {rounded_qty:.4f} shares")
+            return self.wb.place_order(
+                stock=symbol,
+                price=price,
+                action=action,
+                orderType=order_type,
+                enforce='DAY',
+                quant=rounded_qty,
+                outsideRegularTradingHour=False
+            )
+        except Exception as e:
+            self.logger.debug(f"Rounded fractional order failed: {e}")
+        
+        # Method 3: If available, try dollar-based order (some brokers prefer this)
+        try:
+            dollar_amount = quantity * price
+            self.logger.debug(f"🔍 Note: Fractional order attempts failed, will fall back to whole shares")
+            # Return a failure indicator so we can try whole shares
+            return {'success': False, 'msg': 'Fractional order methods exhausted'}
+        except Exception as e:
+            return {'success': False, 'msg': f'All fractional methods failed: {e}'}
+
+    def _is_fractional_share_error(self, error_message: str) -> bool:
+        """Check if error is related to fractional share issues"""
+        if not error_message:
+            return False
+        
+        fractional_errors = [
+            'minimum fractional number',
+            'fractional shares not supported',
+            'fractional trading not available',
+            'does not support fractional',
+            'fractional order failed'
+        ]
+        
+        error_lower = error_message.lower()
+        return any(err in error_lower for err in fractional_errors)
+
+    def _parse_order_result(self, order_result):
+        """Parse order result and return success, order_id, error_message"""
+        if order_result is None:
+            return False, None, "No order result received"
+        
+        if isinstance(order_result, dict):
+            if order_result.get('success') == True:
+                return True, order_result.get('orderId', 'Unknown'), None
+            elif 'data' in order_result and 'orderId' in order_result['data']:
+                return True, order_result['data']['orderId'], None
+            elif 'orderId' in order_result:
+                return True, order_result['orderId'], None
+            else:
+                error_msg = order_result.get('msg', f'Order failed: {order_result}')
+                return False, None, error_msg
+        
+        return False, None, f"Unexpected order result format: {order_result}"
     
     def _is_retryable_trade_error(self, order_result, error_message):
         """Determine if a trade error is retryable"""

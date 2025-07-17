@@ -30,7 +30,7 @@ class FractionalSettings:
     """Fractional trading configurations"""
     fund_buffer: float = 0.9
     min_order_amount: float = 5.0
-    order_type: str = 'LMT'
+    order_type: str = 'MKT'
 
 class ConfigurationManager:
     """Central configuration manager following composition over inheritance"""
