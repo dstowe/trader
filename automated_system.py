@@ -566,7 +566,7 @@ class EnhancedAutomatedTradingSystem:
         """Check if stock supports fractional shares"""
         # Stocks that typically DON'T support fractional shares
         no_fractional_stocks = {
-            'BRK-A', 'BRK-B',  # Berkshire Hathaway (too expensive/special rules)
+            'BRK-A',  # Berkshire Hathaway (too expensive/special rules)
             # Add others as discovered
         }
         
