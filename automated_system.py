@@ -25,6 +25,7 @@ try:
     from trading_system.database.models import DatabaseManager
     from trading_system.auth import CredentialManager, LoginManager, SessionManager
     from trading_system.accounts import AccountManager, AccountInfo
+    from enhanced_day_trading_protection import EnhancedDayTradingProtection
     TRADING_SYSTEM_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️ Warning: Trading system imports failed: {e}")
@@ -164,7 +165,13 @@ class EnhancedAutomatedTradingSystem:
             self.logger.info("Attempting fresh login...")
             if self.login_manager.login_automatically():
                 self.logger.info("✅ Fresh login successful")
-                self.is_logged_in = True
+                self.is_logged_in = True                
+                
+                # ✅ ADD: Initialize day trading protection after successful login
+                self.day_trade_protection = EnhancedDayTradingProtection(
+                    self.wb, self.config, self.logger
+                )
+                self.logger.info("✅ Enhanced day trading protection initialized")
                 
                 # Save the new session
                 self.session_manager.save_session(self.wb)
@@ -308,7 +315,7 @@ class EnhancedAutomatedTradingSystem:
         return scan_universe
     
     def filter_signals_for_account(self, signals: List[Dict], account: AccountInfo) -> List[Dict]:
-        """Filter signals for specific account using PersonalTradingConfig rule enforcement"""
+        """Filter signals for specific account using ENHANCED PersonalTradingConfig rule enforcement"""
         filtered_signals = []
         position_symbols = [pos['symbol'] for pos in account.positions]
         account_trades = [t for t in self.todays_trades if t.get('account_id') == account.account_id]
@@ -319,17 +326,25 @@ class EnhancedAutomatedTradingSystem:
             return []
         
         for signal in signals:
-            # Assuming signal is a TradingSignal object, not a dict
             symbol = signal.symbol
             signal_type = signal.signal_type
             
-            # Use PersonalTradingConfig comprehensive signal validation (AUTHORITATIVE)
-            should_execute, reason = self.config.should_execute_signal(
-                signal,
-                current_positions=position_symbols,
-                account_value=account.net_liquidation,
-                recent_trades=account_trades
-            )
+            # ✅ ENHANCED: Use live Webull day trading protection instead of basic check
+            if self.day_trade_protection:
+                should_execute, reason = self.day_trade_protection.enhanced_should_execute_signal(
+                    signal,
+                    current_positions=position_symbols,
+                    account_value=account.net_liquidation,
+                    account_id=account.account_id
+                )
+            else:
+                # Fallback to original method if day trading protection not initialized
+                should_execute, reason = self.config.should_execute_signal(
+                    signal,
+                    current_positions=position_symbols,
+                    account_value=account.net_liquidation,
+                    recent_trades=account_trades
+                )
             
             if not should_execute:
                 self.logger.debug(f"⚠️ {account.account_type}: Filtered {symbol} - {reason}")
@@ -340,13 +355,11 @@ class EnhancedAutomatedTradingSystem:
                 self.logger.debug(f"🚨 {account.account_type}: BUY-AND-HOLD PROTECTION for {symbol}")
                 continue
             
-            # Position sizing for BUY signals using CENTRALIZED method (UPDATED)
+            # Position sizing for BUY signals using CENTRALIZED method
             if signal_type == 'BUY':
-                # Extract strategy name and metadata for position adjustments
                 strategy_name = signal.strategy
-                signal_metadata = signal.metadata # Assuming metadata is directly accessible
+                signal_metadata = signal.metadata
                 
-                # Use centralized position sizing with strategy adjustments
                 position_info = self.config.get_position_size_with_strategy_adjustments(
                     signal.price,
                     account.net_liquidation,
@@ -359,12 +372,10 @@ class EnhancedAutomatedTradingSystem:
                     self.logger.debug(f"⚠️ {account.account_type}: Insufficient funds for {symbol} - {position_info.get('reason', 'Unknown')}")
                     continue
                 
-                # Convert signal to a dictionary for easier modification if necessary, or add attribute
-                # If TradingSignal is mutable, you could directly add:
                 signal.calculated_position_info = position_info
                 signal.target_account = account.account_id
             
-            filtered_signals.append(signal) # Append the modified TradingSignal object
+            filtered_signals.append(signal)
         
         return filtered_signals
     
@@ -823,6 +834,26 @@ class EnhancedAutomatedTradingSystem:
             if not self.authenticate():
                 return False
             
+            # ✅ ADD: Day Trading Summary (after authentication)
+            if self.day_trade_protection:
+                try:
+                    dt_summary = self.day_trade_protection.get_day_trading_summary()
+                    self.logger.info("📊 LIVE DAY TRADING SUMMARY:")
+                    self.logger.info(f"   Total trades today: {dt_summary['total_trades']}")
+                    self.logger.info(f"   Symbols traded: {dt_summary['symbols_traded']}")
+                    self.logger.info(f"   Buy trades: {dt_summary['buy_count']}")
+                    self.logger.info(f"   Sell trades: {dt_summary['sell_count']}")
+                    self.logger.info(f"   Potential day trades: {dt_summary['potential_day_trades']}")
+                    
+                    if dt_summary['symbols_with_day_trade_risk']:
+                        self.logger.warning(f"   ⚠️ Day trade risk symbols: {', '.join(dt_summary['symbols_with_day_trade_risk'])}")
+                    
+                    if dt_summary['total_trades'] > 0:
+                        self.logger.info("   🔍 Enhanced day trading protection is ACTIVE")
+                    
+                except Exception as e:
+                    self.logger.warning(f"Could not generate day trading summary: {e}")            
+            
             # Step 2: Discover and setup accounts
             self.logger.info("💼 Step 2: Enhanced account discovery and setup...")
             if not self.discover_and_setup_accounts():
@@ -1040,13 +1071,29 @@ class EnhancedAutomatedTradingSystem:
             
             self.logger.info("="*80)
             
-            return True
+           
+            # ✅ ADD: Final day trading protection summary
+            if executed_trades > 0 and self.day_trade_protection:
+                try:
+                    # Refresh the summary after trades
+                    final_summary = self.day_trade_protection.get_day_trading_summary()
+                    self.logger.info("📊 FINAL DAY TRADING STATUS:")
+                    self.logger.info(f"   Total trades after execution: {final_summary['total_trades']}")
+                    self.logger.info(f"   New potential day trades: {final_summary['potential_day_trades']}")
+                    
+                    if final_summary['symbols_with_day_trade_risk']:
+                        self.logger.warning(f"   ⚠️ Symbols now requiring day trade protection: {', '.join(final_summary['symbols_with_day_trade_risk'])}")
+                
+                except Exception as e:
+                    self.logger.warning(f"Could not generate final day trading summary: {e}")
             
+            return True
+
         except Exception as e:
             self.logger.error(f"❌ CRITICAL ENHANCED SYSTEM ERROR: {e}")
             self.logger.error("📋 Full error details:", exc_info=True)
             return False
-
+        
 
 def setup_credentials():
     """One-time setup to encrypt and store credentials using new modular system"""
