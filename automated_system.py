@@ -235,7 +235,7 @@ class EnhancedAutomatedTradingSystem:
         
         # Check if it's a weekday (Monday = 0, Sunday = 6)
         weekday = datetime.now().weekday()
-        is_weekday = weekday < 7 # Monday-Friday
+        is_weekday = weekday < 5  # Monday-Friday
         
         if not is_weekday:
             self.logger.info("Not running - market closed (weekend)")
