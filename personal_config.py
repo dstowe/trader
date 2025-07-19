@@ -85,7 +85,7 @@ class PersonalTradingConfig:
     PREFER_DIVIDEND_STOCKS = True      # Prefer dividend paying stocks
 
     # Time Preferences
-    TRADING_START_TIME = "09:45"  # Wait 15 min after market open
+    TRADING_START_TIME = "08:45"  # Wait 15 min after market open
     TRADING_END_TIME = "15:30"    # Stop 30 min before close
 
     # Notification Preferences
