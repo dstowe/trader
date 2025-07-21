@@ -74,6 +74,9 @@ class EnhancedAutomatedTradingSystem:
         
         # Trading state
         self.is_logged_in = False
+
+        # Initialize day trading protection as None (will be set after authentication)
+        self.day_trade_protection = None
         
         # Safety checks - ALL values now from PersonalTradingConfig
         self.today = datetime.now().date()
