@@ -247,8 +247,9 @@ class EnhancedAutomatedTradingSystem:
         return True
     
     def check_safety_limits_for_accounts(self):
-        """Enhanced safety checks using PersonalTradingConfig limits (SINGLE SOURCE OF TRUTH)"""
+        """Enhanced safety checks - FIXED to allow individual account trading"""
         safety_issues = []
+        eligible_accounts = []  # Track accounts that can trade
         
         total_trades_today = len(self.todays_trades)
         total_accounts = len(self.trading_accounts)
@@ -259,43 +260,59 @@ class EnhancedAutomatedTradingSystem:
         # Check total daily trade limit across all accounts
         if total_trades_today >= max_total_trades:
             safety_issues.append(f"Total daily trade limit reached: {total_trades_today}/{max_total_trades} across all accounts")
+            return False  # This is a system-wide limit
         
         # Check each account individually using PersonalTradingConfig
         for account in self.trading_accounts:
+            account_issues = []
             account_trades_today = len([t for t in self.todays_trades if t.get('account_id') == account.account_id])
             
             # Check per-account trade limit using PersonalTradingConfig (AUTHORITATIVE)
             if account_trades_today >= self.config.MAX_POSITIONS_TOTAL:
-                safety_issues.append(f"{account.account_type}: Daily trade limit reached ({account_trades_today}/{self.config.MAX_POSITIONS_TOTAL})")
+                account_issues.append(f"Daily trade limit reached ({account_trades_today}/{self.config.MAX_POSITIONS_TOTAL})")
             
             # Check minimum account value using PersonalTradingConfig (AUTHORITATIVE)
             if account.net_liquidation < self.config.MIN_POSITION_VALUE:
-                safety_issues.append(f"{account.account_type}: Account value too low (${account.net_liquidation:.2f} < ${self.config.MIN_POSITION_VALUE})")
+                account_issues.append(f"Account value too low (${account.net_liquidation:.2f} < ${self.config.MIN_POSITION_VALUE})")
             
             # Check settled funds using PersonalTradingConfig (AUTHORITATIVE)
             if account.settled_funds < self.config.MIN_FRACTIONAL_ORDER:
-                safety_issues.append(f"{account.account_type}: Insufficient settled funds (${account.settled_funds:.2f} < ${self.config.MIN_FRACTIONAL_ORDER})")
+                account_issues.append(f"Insufficient settled funds (${account.settled_funds:.2f} < ${self.config.MIN_FRACTIONAL_ORDER})")
+            
+            # If account has issues, log them but don't fail entire system
+            if account_issues:
+                for issue in account_issues:
+                    safety_issues.append(f"{account.account_type}: {issue}")
+                self.logger.warning(f"⚠️ {account.account_type} excluded from trading: {'; '.join(account_issues)}")
+            else:
+                eligible_accounts.append(account)
+                self.logger.info(f"✅ {account.account_type} eligible for trading: ${account.settled_funds:.2f} available")
         
-        # Calculate combined available funds using PersonalTradingConfig method (AUTHORITATIVE)
-        total_available = sum(min(
-            account.net_liquidation * self.config.MAX_POSITION_VALUE_PERCENT,
-            account.settled_funds
-        ) for account in self.trading_accounts)
-        
-        if total_available < self.config.MIN_POSITION_VALUE:
-            safety_issues.append(f"Insufficient combined funds for minimum position: ${total_available:.2f} < ${self.config.MIN_POSITION_VALUE}")
-        
-        # Log safety check results
-        if safety_issues:
-            self.logger.warning("⚠️ Safety limit violations detected:")
+        # Update trading_accounts to only include eligible accounts
+        if eligible_accounts:
+            original_count = len(self.trading_accounts)
+            self.trading_accounts = eligible_accounts
+            
+            if len(eligible_accounts) < original_count:
+                self.logger.info(f"🎯 Trading with {len(eligible_accounts)}/{original_count} accounts that meet safety requirements")
+            
+            # Log safety check results for eligible accounts
+            total_available = sum(min(
+                account.net_liquidation * self.config.MAX_POSITION_VALUE_PERCENT,
+                account.settled_funds
+            ) for account in self.trading_accounts)
+            
+            self.logger.info("✅ Enhanced safety checks passed for eligible accounts")
+            self.logger.info(f"   💰 Combined available for trading: ${total_available:.2f}")
+            self.logger.info(f"   📊 Eligible accounts: {len(eligible_accounts)}")
+            
+            return True
+        else:
+            # All accounts failed safety checks
+            self.logger.warning("⚠️ No accounts meet safety requirements:")
             for issue in safety_issues:
                 self.logger.warning(f"   • {issue}")
             return False
-        else:
-            self.logger.info("✅ All enhanced safety checks passed")
-            self.logger.info(f"   💰 Combined available for trading: ${total_available:.2f}")
-            self.logger.info(f"   📊 Trades remaining today: {max_total_trades - total_trades_today}")
-            return True
     
     def get_combined_scan_universe(self) -> List[str]:
         """Get combined scan universe using PersonalTradingConfig method (SINGLE SOURCE OF TRUTH)"""
