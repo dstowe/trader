@@ -168,13 +168,16 @@ class EnhancedAutomatedTradingSystem:
             self.logger.info("Attempting fresh login...")
             if self.login_manager.login_automatically():
                 self.logger.info("✅ Fresh login successful")
-                self.is_logged_in = True                
-                
+                self.is_logged_in = True 
+
+                # 👈 **ADD THIS CODE HERE**
                 # ✅ ADD: Initialize day trading protection after successful login
                 self.day_trade_protection = EnhancedDayTradingProtection(
                     self.wb, self.config, self.logger
                 )
-                self.logger.info("✅ Enhanced day trading protection initialized")
+                # Set account manager reference (will be set later in discover_and_setup_accounts)
+                self.logger.info("✅ Enhanced day trading protection initialized")                               
+                
                 
                 # Save the new session
                 self.session_manager.save_session(self.wb)
@@ -199,11 +202,15 @@ class EnhancedAutomatedTradingSystem:
             
             # Get enabled accounts from PersonalTradingConfig
             self.trading_accounts = self.account_manager.get_enabled_accounts()
+
+            # 👈 **ADD THIS CODE HERE**
+            # Connect account manager to day trading protection
+            if self.day_trade_protection:
+                self.day_trade_protection.set_account_manager(self.account_manager)
             
             if not self.trading_accounts:
                 self.logger.error("❌ No accounts enabled for trading in PersonalTradingConfig")
-                self.logger.error("   Check ACCOUNT_CONFIGURATIONS in personal_config.py")
-                return False
+                return False     
             
             # Log account summary
             summary = self.account_manager.get_account_summary()
@@ -214,12 +221,27 @@ class EnhancedAutomatedTradingSystem:
             self.logger.info(f"   Combined Cash: ${summary['total_cash']:.2f}")
             self.logger.info(f"   Total Positions: {summary['total_positions']}")
             
+            # 👈 **REPLACE THE EXISTING ACCOUNT LOOP WITH THIS**
             for account in self.trading_accounts:
                 self.logger.info(f"📊 Trading Account: {account.account_type}")
                 self.logger.info(f"   Net Liquidation: ${account.net_liquidation:.2f}")
                 self.logger.info(f"   Settled Funds: ${account.settled_funds:.2f}")
                 self.logger.info(f"   Positions: {len(account.positions)}")
+                
+                # Day trading info
+                if hasattr(account, 'day_trades_remaining') and account.day_trades_remaining is not None:
+                    if account.account_type in ['Cash Account', 'CASH']:
+                        self.logger.info(f"   Day Trading: ✅ Unlimited (Cash Account)")
+                    elif account.day_trades_remaining >= 999:
+                        self.logger.info(f"   Day Trading: ✅ Unlimited (PDT Account)")
+                    else:
+                        self.logger.info(f"   Day Trading: ✅ {account.day_trades_remaining} trades remaining")
+                else:
+                    can_day_trade = account.can_day_trade(self.config)
+                    self.logger.info(f"   Day Trading: {'✅ Allowed' if can_day_trade else '❌ Restricted'}")
             
+            # SUCCESS - accounts discovered and enabled
+            self.logger.info(f"✅ Account setup complete: {len(self.trading_accounts)} accounts ready for trading")
             return True
             
         except Exception as e:
@@ -854,6 +876,7 @@ class EnhancedAutomatedTradingSystem:
             if not self.authenticate():
                 return False
             
+            # 👈 **ADD THIS CODE HERE (REPLACE THE EXISTING DAY TRADING SUMMARY)**
             # ✅ ADD: Day Trading Summary (after authentication)
             if self.day_trade_protection:
                 try:
@@ -871,8 +894,18 @@ class EnhancedAutomatedTradingSystem:
                     if dt_summary['total_trades'] > 0:
                         self.logger.info("   🔍 Enhanced day trading protection is ACTIVE")
                     
+                    # Add account-specific day trading info
+                    for account in self.trading_accounts:
+                        if hasattr(account, 'day_trades_remaining') and account.day_trades_remaining is not None:
+                            if account.account_type in ['Cash Account', 'CASH']:
+                                self.logger.info(f"   💰 {account.account_type}: Unlimited day trading (settled funds)")
+                            elif account.day_trades_remaining >= 999:
+                                self.logger.info(f"   🏦 {account.account_type}: Unlimited day trading (PDT account)")
+                            else:
+                                self.logger.info(f"   🏦 {account.account_type}: {account.day_trades_remaining} day trades remaining")
+                    
                 except Exception as e:
-                    self.logger.warning(f"Could not generate day trading summary: {e}")            
+                    self.logger.warning(f"Could not generate day trading summary: {e}")
             
             # Step 2: Discover and setup accounts
             self.logger.info("💼 Step 2: Enhanced account discovery and setup...")
@@ -1075,6 +1108,8 @@ class EnhancedAutomatedTradingSystem:
             
             # Final enhanced account status using PersonalTradingConfig methods
             self.logger.info(f"📊 Final Enhanced Multi-Account Status:")
+
+            # 👈 **REPLACE THE EXISTING FINAL ACCOUNT LOOP WITH THIS**
             for account in self.trading_accounts:
                 account_trades = len([t for t in self.todays_trades if t.get('account_id') == account.account_id])
                 allocation_info = account.get_allocation_info(self.config)
@@ -1085,6 +1120,18 @@ class EnhancedAutomatedTradingSystem:
                 self.logger.info(f"      📋 Positions: {len(account.positions)}/{allocation_info['max_positions']}")
                 self.logger.info(f"      📊 Today's Trades: {account_trades}")
                 self.logger.info(f"      💸 Cash %: {allocation_info['cash_percentage']:.1f}%")
+                
+                # Enhanced day trading status
+                if hasattr(account, 'day_trades_remaining') and account.day_trades_remaining is not None:
+                    if account.account_type in ['Cash Account', 'CASH']:
+                        self.logger.info(f"      🔄 Day Trading: Unlimited (Cash)")
+                    elif account.day_trades_remaining >= 999:
+                        self.logger.info(f"      🔄 Day Trading: Unlimited (PDT)")
+                    else:
+                        self.logger.info(f"      🔄 Day Trading: {account.day_trades_remaining} remaining")
+                else:
+                    can_day_trade = account.can_day_trade(self.config)
+                    self.logger.info(f"      🔄 Day Trading: {'Allowed' if can_day_trade else 'Restricted'}")
             
             if executed_trades > 0:
                 self.logger.info("📱 Check your Webull app for order confirmations")

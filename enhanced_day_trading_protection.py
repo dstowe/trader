@@ -354,48 +354,93 @@ class EnhancedDayTradingProtection:
             return {}
     
     def enhanced_should_execute_signal(self, signal, current_positions=None, 
-                                     account_value=0.0, account_id=None) -> Tuple[bool, str]:
-        """
-        Enhanced signal execution check with live Webull day trading protection
-        
-        This replaces the original should_execute_signal method with enhanced protection
-        """
-        symbol = signal.symbol
-        signal_type = signal.signal_type
-        
-        # First run the original config-based checks
-        original_check, original_reason = self.config.should_execute_signal(
-            signal, current_positions, account_value
-        )
-        
-        if not original_check:
-            return False, original_reason
-        
-        # Now run enhanced day trading check with live Webull data
-        can_execute, dt_reason, trade_context = self.enhanced_day_trading_check(
-            symbol, signal_type, account_id
-        )
-        
-        if not can_execute:
-            # Log the trade context for debugging
-            if trade_context.get('total_trades', 0) > 0:
-                self.logger.info(f"🚫 Day trade blocked for {symbol}:")
-                self.logger.info(f"   Today's trades: {trade_context['total_trades']}")
-                self.logger.info(f"   Buys: {len(trade_context.get('buy_trades', []))}")
-                self.logger.info(f"   Sells: {len(trade_context.get('sell_trades', []))}")
-                self.logger.info(f"   Proposed: {signal_type}")
+                                        account_value=0.0, account_id=None) -> Tuple[bool, str]:
+            """
+            Enhanced signal execution check with live Webull day trading protection
             
-            return False, f"ENHANCED DAY TRADING PROTECTION: {dt_reason}"
-        
-        # Additional check: Verify position exists for SELL signals
-        if signal_type == 'SELL':
-            current_position = self.get_current_position(symbol, account_id)
+            This replaces the original should_execute_signal method with enhanced protection
+            """
+            symbol = signal.symbol
+            signal_type = signal.signal_type
             
-            if not current_position or current_position.get('quantity', 0) <= 0:
-                if not self.config.ALLOW_SHORT_SELLING:
-                    return False, "SELL BLOCKED: No position to sell and short selling disabled"
-        
-        return True, "Enhanced checks passed"
+            # First run the original config-based checks
+            original_check, original_reason = self.config.should_execute_signal(
+                signal, current_positions, account_value
+            )
+            
+            if not original_check:
+                return False, original_reason
+            
+            # Get account info from account manager if available
+            account_info = None
+            if hasattr(self, '_account_manager') and account_id:
+                account_info = self._account_manager.get_account_by_id(account_id)
+            
+            # Enhanced day trading check based on account type
+            if account_info:
+                # Use account-specific day trading logic
+                if account_info.account_type in ['Cash Account', 'CASH']:
+                    # Cash accounts can day trade freely (using settled funds)
+                    self.logger.debug(f"✅ Cash account day trading allowed for {symbol}")
+                    return True, "Cash account - day trading allowed"
+                
+                elif account_info.account_type in ['Margin Account', 'MRGN']:
+                    # Check day trades remaining from Webull
+                    if account_info.day_trades_remaining is not None:
+                        if account_info.day_trades_remaining >= 1:
+                            self.logger.debug(f"✅ Margin account day trading allowed: {account_info.day_trades_remaining} trades remaining")
+                            return True, f"Margin account - {account_info.day_trades_remaining} day trades remaining"
+                        else:
+                            # Check if this would actually be a day trade
+                            can_execute, dt_reason, trade_context = self.enhanced_day_trading_check(
+                                symbol, signal_type, account_id
+                            )
+                            
+                            if not can_execute:
+                                return False, f"DAY TRADE BLOCKED: No day trades remaining (0 left) - {dt_reason}"
+                            else:
+                                return True, "Not a day trade pattern"
+                    
+                    # Fallback to PDT rules for accounts >= $25K
+                    elif account_info.net_liquidation >= 25000:
+                        self.logger.debug(f"✅ PDT account (>=$25K) day trading allowed")
+                        return True, "PDT account - unlimited day trading"
+                    else:
+                        # No day trade data and < $25K - be conservative
+                        can_execute, dt_reason, trade_context = self.enhanced_day_trading_check(
+                            symbol, signal_type, account_id
+                        )
+                        
+                        if not can_execute:
+                            return False, f"DAY TRADE BLOCKED: Margin account <$25K without day trade data - {dt_reason}"
+                        else:
+                            return True, "Not a day trade pattern"
+            
+            # Fallback to live Webull day trading check if no account info
+            can_execute, dt_reason, trade_context = self.enhanced_day_trading_check(
+                symbol, signal_type, account_id
+            )
+            
+            if not can_execute:
+                # Log the trade context for debugging
+                if trade_context.get('total_trades', 0) > 0:
+                    self.logger.info(f"🚫 Day trade blocked for {symbol}:")
+                    self.logger.info(f"   Today's trades: {trade_context['total_trades']}")
+                    self.logger.info(f"   Buys: {len(trade_context.get('buy_trades', []))}")
+                    self.logger.info(f"   Sells: {len(trade_context.get('sell_trades', []))}")
+                    self.logger.info(f"   Proposed: {signal_type}")
+                
+                return False, f"ENHANCED DAY TRADING PROTECTION: {dt_reason}"
+            
+            # Additional check: Verify position exists for SELL signals
+            if signal_type == 'SELL':
+                current_position = self.get_current_position(symbol, account_id)
+                
+                if not current_position or current_position.get('quantity', 0) <= 0:
+                    if not self.config.ALLOW_SHORT_SELLING:
+                        return False, "SELL BLOCKED: No position to sell and short selling disabled"
+            
+            return True, "Enhanced checks passed"
     
     def get_day_trading_summary(self) -> Dict:
         """

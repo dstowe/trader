@@ -221,7 +221,10 @@ class AccountManager:
                 account.positions.append(pos_data)
             
             # Load day trading information
-            self._load_day_trading_info(account)
+            self._load_day_trading_info(account, account_data)
+
+
+
             
             # Log final values
             self.logger.debug(f"📊 Final values for {account.account_type}:")
@@ -236,14 +239,66 @@ class AccountManager:
             self.logger.debug(f"Full exception details:", exc_info=True)
             return False
 
-    def _load_day_trading_info(self, account: AccountInfo):
+    def _load_day_trading_info(self, account: AccountInfo, account_data: Dict):
         """Load day trading information for PDT tracking"""
         try:
-            account.day_trades_used = 0
+            # Extract PDT status from top level
+            account.pdt_status = account_data.get('pdt', False)
+            
+            # Extract day trades remaining from accountMembers
+            account.day_trades_remaining = None
+            
+            for member in account_data.get('accountMembers', []):
+                key = member.get('key', '')
+                value = member.get('value', '')
+                
+                if key == 'remainTradeTimes':
+                    # Parse the remainTradeTimes string (e.g., "2,2,2,2,2")
+                    try:
+                        if isinstance(value, str) and value:
+                            if value.lower() == 'unlimited':
+                                # Cash accounts often show "Unlimited"
+                                account.day_trades_remaining = 999
+                                self.logger.debug(f"   Day trades remaining: Unlimited (set to 999)")
+                            else:
+                                # Split by comma and get the minimum (most restrictive day)
+                                day_trades_list = [int(x.strip()) for x in value.split(',') if x.strip().isdigit()]
+                                if day_trades_list:
+                                    account.day_trades_remaining = min(day_trades_list)
+                                    self.logger.debug(f"   Day trades remaining: {account.day_trades_remaining} (from {value})")
+                                else:
+                                    self.logger.warning(f"   Could not parse remainTradeTimes: {value}")
+                        elif isinstance(value, (int, float)):
+                            account.day_trades_remaining = int(value)
+                    except Exception as e:
+                        self.logger.warning(f"   Error parsing remainTradeTimes '{value}': {e}")
+                        
+            # Set defaults if not found
+            if account.day_trades_remaining is None:
+                if account.account_type in ['Cash Account', 'CASH']:
+                    # Cash accounts don't have day trade limits
+                    account.day_trades_remaining = 999  # Unlimited for cash
+                elif account.pdt_status:
+                    # PDT accounts (>=25K) have unlimited day trades
+                    account.day_trades_remaining = 999
+                else:
+                    # Default for margin accounts without data
+                    account.day_trades_remaining = 0
+                    
+            account.day_trades_used = 0  # Reset daily (would need to track this)
             account.last_day_trade_reset = datetime.now().strftime('%Y-%m-%d')
+            
+            self.logger.debug(f"📊 Day Trading Info for {account.account_type}:")
+            self.logger.debug(f"   PDT Status: {account.pdt_status}")
+            self.logger.debug(f"   Day Trades Remaining: {account.day_trades_remaining}")
             
         except Exception as e:
             self.logger.warning(f"⚠️ Could not load day trading info for {account.account_id}: {e}")
+            # Set safe defaults
+            account.day_trades_remaining = 0 if account.account_type not in ['Cash Account', 'CASH'] else 999
+            account.pdt_status = False
+            account.day_trades_used = 0
+            account.last_day_trade_reset = datetime.now().strftime('%Y-%m-%d')
     
     def get_enabled_accounts(self) -> List[AccountInfo]:
         """Get list of accounts enabled for trading based on PersonalTradingConfig"""

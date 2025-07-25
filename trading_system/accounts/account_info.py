@@ -58,17 +58,28 @@ class AccountInfo:
         return config.ACCOUNT_CONFIGURATIONS.get(config_key, {})
     
     def can_day_trade(self, config) -> bool:
-        """Check if this account can perform day trading"""
-        account_config = self.get_account_config(config)
-        if not account_config.get('day_trading_enabled', False):
-            return False
-        
-        # Check PDT protection requirements
-        if account_config.get('pdt_protection', False):
-            min_value = account_config.get('min_account_value_for_pdt', 25000)
-            return self.net_liquidation >= min_value
-        
-        return True
+            """Check if this account can perform day trading"""
+            account_config = self.get_account_config(config)
+            if not account_config.get('day_trading_enabled', False):
+                return False
+            
+            # Cash accounts can always day trade (using settled funds)
+            if self.account_type in ['Cash Account', 'CASH']:
+                return True
+            
+            # For margin accounts, check day trades remaining first
+            if hasattr(self, 'day_trades_remaining') and self.day_trades_remaining is not None:
+                if self.day_trades_remaining >= 1:
+                    return True
+                else:
+                    return False  # No day trades remaining
+            
+            # Fallback to PDT protection requirements (for accounts >= $25K)
+            if account_config.get('pdt_protection', False):
+                min_value = account_config.get('min_account_value_for_pdt', 25000)
+                return self.net_liquidation >= min_value
+            
+            return False  # Default to false for margin accounts without day trade data
     
     def get_position_limits(self, config) -> Dict:
         """Get position limits for this account"""
