@@ -188,7 +188,7 @@ class StockLists:
         # Investment Banks
         'GS', 'MS',
         # Insurance
-        'BRK-B', 'AIG',
+        'BRK-B', #'AIG',
         # Financial ETFs
         'XLF', 'KBE'
     ]
@@ -312,7 +312,7 @@ class StockLists:
         'GS', 'MS',
         
         # Insurance
-        'BRK-B', 'AIG',
+        'BRK-B', #'AIG',
         
         # Financial ETFs
         'XLF', 'KBE',  # KBE = SPDR S&P Bank ETF

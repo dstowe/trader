@@ -148,7 +148,7 @@ class PersonalTradingConfig:
             },
             'MARGIN': {
                 'enabled': True,
-                'day_trading_enabled': False,
+                'day_trading_enabled': True,
                 'options_enabled': False,
                 'max_position_size': self.MAX_POSITION_VALUE_PERCENT,
                 'pdt_protection': True,
