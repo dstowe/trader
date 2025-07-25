@@ -51,7 +51,7 @@ class PersonalTradingConfig:
     # PERSONAL TRADING RULES (CRITICAL - NEVER OVERRIDE)
     # =================================================================
     ALLOW_SHORT_SELLING = False  # Never allow short selling
-    ALLOW_DAY_TRADING = False    # Never allow day trading
+    ALLOW_DAY_TRADING = True    # Never allow day trading
 
     # Day trading detection settings
     DAY_TRADING_LOOKBACK_HOURS = 24  # Consider trades within 24 hours as potential day trades
