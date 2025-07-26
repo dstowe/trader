@@ -220,3 +220,13 @@ def setup_credentials_interactive():
     else:
         print("❌ Failed to setup credentials. Please try again.")
         return False
+    
+
+if __name__ == "__main__":
+        
+    try:
+        setup_credentials_interactive()
+    except KeyboardInterrupt:
+        print("\n❌ Cancelled by user")
+    except Exception as e:
+        print(f"\n❌ Unexpected error: {e}")    
